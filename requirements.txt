@@ -1,0 +1,6 @@
+pyscf
+h5py==3.2.1
+cirq~=0.10
+numpy
+openfermion>=1.0.1
+scipy
