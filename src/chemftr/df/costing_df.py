@@ -1,48 +1,9 @@
 """ Determine costs for DF decomposition in QC """
 from typing import Tuple
+from chemftr.util import QR, QI
 import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
-def QR(L : int, M1 : int) -> Tuple[int, int]:
-    """ This gives the optimal k and minimum cost for a QROM over L values of size M1.
-
-    Args:
-        L (int) -
-        M1 (int) -
-
-    Returns:
-       k_opt (int) - k that yields minimal (optimal) cost of QROM
-       val_opt (int) - minimal (optimal) cost of QROM
-    """
-    k = 0.5 * np.log2(L/M1)
-    assert k >= 0
-    value = lambda k: L/np.power(2,k) + M1*(np.power(2,k) - 1)
-    k_int = [np.floor(k),np.ceil(k)]  # restrict optimal k to integers
-    k_opt = k_int[np.argmin(value(k_int))]  # obtain optimal k
-    val_opt = np.ceil(value(k_opt))  # obtain ceiling of optimal value given k
-    assert k_opt.is_integer()
-    assert val_opt.is_integer()
-    return int(k_opt), int(val_opt)
-
-def QI(L: int) -> Tuple[int, int]:
-    """ This gives the optimal k and minimum cost for an inverse QROM over L values.
-
-    Args:
-        L (int) -
-
-    Returns:
-       k_opt (int) - k that yiles minimal (optimal) cost of inverse QROM
-       val_opt (int) - minimal (optimal) cost of inverse QROM
-    """
-    k = 0.5 * np.log2(L)
-    assert k >= 0
-    value = lambda k: L/np.power(2,k) + np.power(2,k)
-    k_int = [np.floor(k),np.ceil(k)]  # restrict optimal k to integers
-    k_opt = k_int[np.argmin(value(k_int))]  # obtain optimal k
-    val_opt = np.ceil(value(k_opt))  # obtain ceiling of optimal value given k
-    assert k_opt.is_integer()
-    assert val_opt.is_integer()
-    return int(k_opt), int(val_opt)
 
 def power_two(m: int) -> int:
     """ Return the power of two that is a factor of m """
@@ -120,20 +81,20 @@ def cost_df(n: int, lam: float, dE: float, L: int, Lxi: int, chi: int, beta: int
     # The total cost for preparing the first register in step 1.
     cost1 = cost1a + cost1b + cost1cd
 
-    # The output size for the QROM for the data to prepare the equal superposition on the second 
+    # The output size for the QROM for the data to prepare the equal superposition on the second
     # register, as given in Eq. (C29).
     bo = nxi + nLxi + br + 1
 
-    # This is step 2. This is the cost of outputting the data to prepare the equal superposition on 
-    # the second register. We will assume it is not uncomputed, because we want to keep the offset 
+    # This is step 2. This is the cost of outputting the data to prepare the equal superposition on
+    # the second register. We will assume it is not uncomputed, because we want to keep the offset
     # for applying the QROM for outputting the rotations.
     cost2 = QR(L + 1, bo)[1] + QI(L + 1)[1]
 
-    # The number of bits for rotating the ancilla for the second preparation. We are just entering 
+    # The number of bits for rotating the ancilla for the second preparation. We are just entering
     #this manually because it is a typical value.
     br = 7
 
-    # The cost of preparing an equal superposition over the second register in a controlled way. 
+    # The cost of preparing an equal superposition over the second register in a controlled way.
     # We pay this cost 4 times.
     cost3a = 4 * (7 * nxi + 2 * br - 6)
 
@@ -142,7 +103,7 @@ def cost_df(n: int, lam: float, dE: float, L: int, Lxi: int, chi: int, beta: int
 
     bp2 = nxi + chi + 2
 
-    # The cost of the QROMs and inverse QROMs for the state preparation, where in the first one we 
+    # The cost of the QROMs and inverse QROMs for the state preparation, where in the first one we
     # need + n/2 to account for the one-electron terms.
     cost3c = QR(Lxi + n//2, bp2)[1] + QI(Lxi + n//2)[1] + QR(Lxi, bp2)[1] + QI(Lxi)[1]
 
