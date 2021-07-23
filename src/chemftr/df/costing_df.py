@@ -1,20 +1,8 @@
 """ Determine costs for DF decomposition in QC """
 from typing import Tuple
-from chemftr.util import QR, QI
+from chemftr.util import QR, QI, power_two
 import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
-
-
-def power_two(m: int) -> int:
-    """ Return the power of two that is a factor of m """
-    assert m >= 0
-    if m % 2 == 0:
-        count = 0
-        while (m > 0) and (m % 2 == 0):
-            m = m // 2
-            count += 1
-        return count
-    return 0
 
 
 def cost_df(n: int, lam: float, dE: float, L: int, Lxi: int, chi: int, beta: int, stps: int,

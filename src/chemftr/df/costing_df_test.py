@@ -1,6 +1,6 @@
 """Test cases for costing_df.py
 """
-from chemftr.df.costing_df import cost_df, power_two
+from chemftr.df.costing_df import cost_df
 
 
 def test_reiher_df():
@@ -21,11 +21,9 @@ def test_reiher_df():
     stps1 = output[0]
     output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps1)
     assert output == (21753, 10073183463, 3725)
-    print("OUTPUT (Reiher): ", output)
-
 
 def test_li_df():
-    """ Reproduce Li et al orbital THC DF costs from paper """
+    """ Reproduce Li et al orbital DF FT costs from paper """
     DE = 0.001
     CHI = 10
 
@@ -42,18 +40,3 @@ def test_li_df():
     stps2 = output[0]
     output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps2)
     assert output == (35008, 64404812736, 6404)
-    print("OUTPUT (Li): ", output)
-
-
-def test_power_two():
-    """ Test for power_two(m) which returns power of 2 that is a factor of m """
-    try:
-        power_two(-1234)
-    except AssertionError:
-        pass
-    assert power_two(0) == 0
-    assert power_two(2) == 1
-    assert power_two(3) == 0
-    assert power_two(104) == 3  # 2**3 * 13
-    assert power_two(128) == 7  # 2**7
-    assert power_two(393120) == 5  # 2**5 * 3**3 * 5 * 7 * 13
