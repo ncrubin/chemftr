@@ -65,7 +65,9 @@ def main() -> None:
         install_requires=requirements,
         license='Apache 2',
         packages=find_packages(where='src'),
-        package_dir={'': 'src'}
+        package_dir={'': 'src'},
+        package_data={'': ['integrals/*']},
+        include_package_data=True
         )
 
 

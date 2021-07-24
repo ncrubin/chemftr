@@ -1,10 +1,12 @@
 """ Compute lambda for single low rank factorization method of Berry, et al """
+from typing import Tuple
 import os
 import numpy as np
 import h5py
 
 
-def single_factor_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool) -> float:
+def compute_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool = False)\
+    -> Tuple[int, float]:
     """ Compute lambda for Hamiltonian using SF method of Berry, et al.
 
     Args:
@@ -14,6 +16,7 @@ def single_factor_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool
         verify_eri (bool) - check full cholesky integrals and ERIs are equivalent to epsilon
 
     Returns:
+        n_orb (int) - number of spin orbitals
         lambda_tot (float) - lambda value for the single factorized Hamiltonian
     """
 
@@ -24,18 +27,18 @@ def single_factor_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool
     cwd = os.path.dirname(os.path.abspath(__file__))
     with h5py.File(os.path.join(cwd, "..", "integrals",
                                 "eri_"+integral_name+".h5"), "r") as f:
-        eri = f['eri'][()]
-        h0 = f['h0'][()]
+        eri = np.asarray(f['eri'][()])
+        h0  = np.asarray(f['h0'][()])
 
     with h5py.File(os.path.join(cwd, "..", "integrals",
                                 "eri_"+integral_name+"_cholesky.h5"), "r") as f:
-        cholesky_diagonals = f["gval"][()]
-        cholesky_lower_tri = f["gvec"][()]
+        cholesky_diagonals = np.asarray(f["gval"][()])
+        cholesky_lower_tri = np.asarray(f["gvec"][()])
 
     n_orb = len(h0)  # number orbitals
 
     # Check dims are consistent
-    assert [n_orb] * 4 == [*(np.asarray(eri).shape)]
+    assert [n_orb] * 4 == [*eri.shape]
 
     # eliminate diagonals D from Cholesky decomposition LDL^T
     L = np.einsum("ij,j->ji",cholesky_lower_tri,
@@ -46,7 +49,7 @@ def single_factor_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool
         eri_new = np.einsum("ijP,Pkl->ijkl",L.T,L,optimize=True)
         assert np.allclose(eri_new.flatten(),eri.flatten())
 
-    # Effective one electron operator contributio
+    # Effective one electron operator contribution
     T = h0 - 0.5 * np.einsum("pqqs->ps", eri, optimize=True) +\
         np.einsum("pqrr->pq", eri, optimize = True)
 
@@ -59,7 +62,7 @@ def single_factor_lambda(cholesky_dim: int, integral_name: str, verify_eri: bool
     lambda_W = 0.25 * np.einsum("Pij,Pkl->",np.abs(LR), np.abs(LR), optimize=True)
     lambda_tot = lambda_T + lambda_W
 
-    return lambda_tot
+    return n_orb * 2, lambda_tot  #  return number spin orbitals from spatial and combined lambda
 
 
 if __name__ == '__main__':
@@ -67,6 +70,8 @@ if __name__ == '__main__':
     CHOL_DIM = 200
     NAME = 'reiher'
     VERIFY=True
-    total_lambda = single_factor_lambda(cholesky_dim=CHOL_DIM,integral_name=NAME,verify_eri=VERIFY)
-    print(total_lambda)
+    number_orbitals, total_lambda = compute_lambda(cholesky_dim=CHOL_DIM,
+        integral_name=NAME,verify_eri=VERIFY)
+    print(number_orbitals, total_lambda, CHOL_DIM)
+    assert number_orbitals == 108
     assert np.isclose(total_lambda,4258.0)

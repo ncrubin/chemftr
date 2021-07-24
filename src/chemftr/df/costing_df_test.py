@@ -1,6 +1,6 @@
 """Test cases for costing_df.py
 """
-from chemftr.df.costing_df import cost_df
+from chemftr import df
 
 
 def test_reiher_df():
@@ -17,9 +17,9 @@ def test_reiher_df():
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
+    output = df.compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
     stps1 = output[0]
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps1)
+    output = df.compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps1)
     assert output == (21753, 10073183463, 3725)
 
 def test_li_df():
@@ -36,7 +36,7 @@ def test_li_df():
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
+    output = df.compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
     stps2 = output[0]
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps2)
+    output = df.compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps2)
     assert output == (35008, 64404812736, 6404)

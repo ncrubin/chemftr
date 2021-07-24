@@ -5,7 +5,7 @@ import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
 
-def cost_df(n: int, lam: float, dE: float, L: int, Lxi: int, chi: int, beta: int, stps: int,
+def compute_cost(n: int, lam: float, dE: float, L: int, Lxi: int, chi: int, beta: int, stps: int,
              verbose: bool = False) -> Tuple[int, int, int]:
     """ Determine fault-tolerant costs using DF decomposition in quantum chemistry
 
@@ -212,9 +212,9 @@ if __name__ == '__main__':
     BETA = 16
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
+    output = compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
     stps1 = output[0]
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps1)
+    output = compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps1)
     assert output == (21753, 10073183463, 3725)
     print("OUTPUT (Reiher): ", output)
 
@@ -226,8 +226,8 @@ if __name__ == '__main__':
     BETA = 20
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
+    output = compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps=20000)
     stps2 = output[0]
-    output = cost_df(N,LAM,DE,L,LXI,CHI,BETA,stps2)
+    output = compute_cost(N,LAM,DE,L,LXI,CHI,BETA,stps2)
     assert output == (35008, 64404812736, 6404)
     print("OUTPUT (Li): ", output)

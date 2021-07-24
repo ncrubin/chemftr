@@ -5,7 +5,7 @@ import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
 
-def cost_sf(n: int, lam: float, dE: float, L: int, chi: int, stps: int,
+def compute_cost(n: int, lam: float, dE: float, L: int, chi: int, stps: int,
              verbose: bool = False) -> Tuple[int, int, int]:
     """ Determine fault-tolerant costs using SF decomposition in quantum chemistry
 
@@ -181,9 +181,9 @@ if __name__ == '__main__':
     L = 200
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_sf(N,LAM,DE,L,CHI,stps=20000)
+    output = compute_cost(N,LAM,DE,L,CHI,stps=20000)
     stps1 = output[0]
-    output = cost_sf(N,LAM,DE,L,CHI,stps1)
+    output = compute_cost(N,LAM,DE,L,CHI,stps1)
     assert output == (14184, 94868988984, 3320)
     print("OUTPUT (Reiher): ", output)
 
@@ -193,8 +193,8 @@ if __name__ == '__main__':
     L = 275
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_sf(N,LAM,DE,L,CHI,stps=20000)
+    output = compute_cost(N,LAM,DE,L,CHI,stps=20000)
     stps2 = output[0]
-    output = cost_sf(N,LAM,DE,L,CHI,stps2)
+    output = compute_cost(N,LAM,DE,L,CHI,stps2)
     assert output == (24396, 117714920508, 3628)
     print("OUTPUT (Li): ", output)

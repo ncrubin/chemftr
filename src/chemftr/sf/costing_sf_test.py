@@ -1,6 +1,6 @@
 """Test cases for costing_sf.py
 """
-from chemftr.sf.costing_sf import cost_sf
+from chemftr import sf
 
 
 def test_reiher_sf():
@@ -15,9 +15,9 @@ def test_reiher_sf():
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_sf(N,LAM,DE,L,CHI,stps=20000)
+    output = sf.compute_cost(N,LAM,DE,L,CHI,stps=20000)
     stps1 = output[0]
-    output = cost_sf(N,LAM,DE,L,CHI,stps1)
+    output = sf.compute_cost(N,LAM,DE,L,CHI,stps1)
     assert output == (14184, 94868988984, 3320)
 
 def test_li_sf():
@@ -31,7 +31,7 @@ def test_li_sf():
     L = 275
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_sf(N,LAM,DE,L,CHI,stps=20000)
+    output = sf.compute_cost(N,LAM,DE,L,CHI,stps=20000)
     stps2 = output[0]
-    output = cost_sf(N,LAM,DE,L,CHI,stps2)
+    output = sf.compute_cost(N,LAM,DE,L,CHI,stps2)
     assert output == (24396, 117714920508, 3628)
