@@ -19,7 +19,6 @@ def cost_sparse(n: int, lam: float, d: int, dE: float, chi: int, stps: int) -> T
         beta (int) - equivalent to beth in the document, the number of bits for the rotations
         stps (int) - an approximate number of steps to choose the precision of single qubit
             rotations in preparation of the equal superposition state
-        verbose (bool) - do additional printing of intermediates?
 
     Returns:
         step_cost (int) - Toffolis per step
