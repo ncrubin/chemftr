@@ -17,6 +17,11 @@ stps1 = sf.compute_cost(n_orb, lam, DE, L=RANK, chi=CHI,stps=20000)[0]
 sf_cost, sf_total_cost, sf_logical_qubits = sf.compute_cost(n_orb, lam, DE, L=RANK,
     chi=CHI,stps=stps1)
 
+print("[*] Reiher FeMoco Hamiltonian (cf. Table III)")
+print("  [+] Single Factorization: ")
+print("      [-] Logical qubits: %s" % sf_logical_qubits)
+print("      [-] Toffoli count:  %.1e" % sf_total_cost)
+
 """ Double factorization on Reiher FeMoco """
 BETA = 16
 THRESH = 0.00125
@@ -28,12 +33,15 @@ stps2 = df.compute_cost(n_orb, lam, DE, L=rank, Lxi=num_eigen, chi=CHI, beta=BET
 df_cost, df_total_cost, df_logical_qubits = df.compute_cost(n_orb, lam, DE, L=rank, Lxi=num_eigen,
      chi=CHI, beta=BETA,stps=stps2)
 
-
-print("[*] Reiher FeMoco Hamiltonian (cf. Table III)")
-print("  [+] Single Factorization: ")
-print("      [-] Logical qubits: %s" % sf_logical_qubits)
-print("      [-] Toffoli count:  %.1e" % sf_total_cost)
-
 print("  [+] Double Factorization: ")
 print("      [-] Logical qubits: %s" % df_logical_qubits)
 print("      [-] Toffoli count:  %.1e" % df_total_cost)
+
+""" Example to reproduce first two columns of Table XI in the THC paper"""
+
+print("\n[*] Reiher FeMoco Hamiltonian (cf. Table XI)")
+print("        Rank (L)          Lambda            ")
+print("============================================")
+for rank in range(50,401,25):
+    n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=REIHER_INTS)
+    print("            %4d          %4.1f             " % (rank, lam))
