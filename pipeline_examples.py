@@ -5,10 +5,11 @@ import numpy as np
 """ Global defaults from paper """
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
+REIHER_INTS = './src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 
 """ Single factorization on Reiher FeMoco """
 RANK = 200
-n_orb, lam = sf.compute_lambda(cholesky_dim=RANK, integral_name='reiher')
+n_orb, lam = sf.compute_lambda(cholesky_dim=RANK, integral_path=REIHER_INTS)
 
 # Here we're using an initial calculation with a very rough estimate of the number of steps
 # to give a more accurate number of steps. Then we input that into the function again.
@@ -19,7 +20,7 @@ sf_cost, sf_total_cost, sf_logical_qubits = sf.compute_cost(n_orb, lam, DE, L=RA
 """ Double factorization on Reiher FeMoco """
 BETA = 16
 THRESH = 0.00125
-n_orb, lam, rank, num_eigen = df.compute_lambda(thresh=THRESH, integral_name='reiher')
+n_orb, lam, rank, num_eigen = df.compute_lambda(thresh=THRESH, integral_path=REIHER_INTS)
 
 # Here we're using an initial calculation with a very rough estimate of the number of steps
 # to give a more accurate number of steps. Then we input that into the function again.

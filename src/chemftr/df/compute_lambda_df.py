@@ -1,18 +1,16 @@
 """ Compute lambda for double low rank factorization method of von Burg, et al """
 from typing import Tuple
-import os
 import numpy as np
 import h5py
 
 
-def compute_lambda(thresh: float, integral_name: str, verify_eri: bool = False)\
+def compute_lambda(thresh: float, integral_path: str, verify_eri: bool = False)\
      -> Tuple[int, float, float, float]:
     """ Compute lambda for Hamiltonian using DF method of von Burg, et al.
 
     Args:
         thresh (float) - dimension to retain in Cholesky for low-rank reconstruction of ERIs
-        integral_name (str) - name to indicate which integrals to use (currently only 'reiher' will
-            work, and this argument will very likely change in the future.)
+        integral_path (str) - path to file which integrals to use; assumes hdf5 with 'h0' and 'eri'
         verify_eri (bool) - check full cholesky integrals and ERIs are equivalent to epsilon
 
     Returns:
@@ -22,13 +20,7 @@ def compute_lambda(thresh: float, integral_name: str, verify_eri: bool = False)\
         Lxi (int) - the total number of eigenvectors
     """
 
-    integral_name = str(integral_name).lower()
-
-    # Import data from disk for now.
-    #FIXME: move outside function + refactor after PySCF is integrated into pipeline
-    cwd = os.path.dirname(os.path.abspath(__file__))
-    with h5py.File(os.path.join(cwd, "..", "integrals",
-                                "eri_"+integral_name+".h5"), "r") as f:
+    with h5py.File(integral_path, "r") as f:
         eri = np.asarray(f['eri'][()])
         h0  = np.asarray(f['h0'][()])
 
@@ -36,27 +28,19 @@ def compute_lambda(thresh: float, integral_name: str, verify_eri: bool = False)\
     # Check dims are consistent
     assert [n_orb] * 4 == [*eri.shape]
 
-    try:
-        with h5py.File(os.path.join(cwd, "..", "integrals",
-                                    "eri_"+integral_name+"_cholesky.h5"), "r") as f:
-            cholesky_diagonals = np.asarray(f["gval"][()])
-            cholesky_lower_tri = np.asarray(f["gvec"][()])
+    # Cholesky factored ints do not exist, so create them
+    cholesky_diagonals, cholesky_lower_tri = np.linalg.eigh(eri.reshape(n_orb **2, n_orb **2))
 
-    except FileNotFoundError:
+    # Put in descending order
+    cholesky_diagonals = cholesky_diagonals[::-1]
+    cholesky_lower_tri = cholesky_lower_tri[:,::-1]
 
-        # Cholesky factored ints do not exist, so create them
-        cholesky_diagonals, cholesky_lower_tri = np.linalg.eigh(eri.reshape(n_orb **2, n_orb **2))
+    # Truncate
+    # FIXME: add user-defined threshold (usually 1E-8 is more than enough)
+    idx = np.where(cholesky_diagonals > 1.15E-16)[0]
+    cholesky_diagonals, cholesky_lower_tri = cholesky_diagonals[idx], cholesky_lower_tri[:,idx]
 
-        # Put in descending order
-        cholesky_diagonals = cholesky_diagonals[::-1]
-        cholesky_lower_tri = cholesky_lower_tri[:,::-1]
-
-        # Truncate
-        # FIXME: add user-defined threshold (usually 1E-8 is more than enough)
-        idx = np.where(cholesky_diagonals > 1.15E-16)[0]
-        cholesky_diagonals, cholesky_lower_tri = cholesky_diagonals[idx], cholesky_lower_tri[:,idx]
-
-        #FIXME: Add option to save rank reduced integrals
+    #FIXME: Add option to save and read rank-reduced integrals
 
     # eliminate diagonals D from Cholesky decomposition LDL^T
     L = np.einsum("ij,j->ij",cholesky_lower_tri,
@@ -119,10 +103,10 @@ def compute_lambda(thresh: float, integral_name: str, verify_eri: bool = False)\
 if __name__ == '__main__':
 
     THRESH = 0.00125
-    NAME = 'reiher'
+    NAME = '../integrals/eri_reiher.h5'
     VERIFY=True
     n_orbital, total_lambda, rank, num_eigen = compute_lambda(thresh=THRESH,
-        integral_name=NAME,verify_eri=VERIFY)
+        integral_path=NAME,verify_eri=VERIFY)
     assert n_orbital == 108
     assert rank == 360
     assert num_eigen == 13031
