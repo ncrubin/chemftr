@@ -2,15 +2,17 @@
 from typing import Tuple
 import numpy as np
 import h5py
+from chemftr.util import modified_cholesky, eigendecomp
 
 
-def compute_lambda(cholesky_dim: int, integral_path: str, verify_eri: bool = False)\
-    -> Tuple[int, float]:
+def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eigendecomp', \
+    verify_eri: bool = False) -> Tuple[int, float]:
     """ Compute lambda for Hamiltonian using SF method of Berry, et al.
 
     Args:
         cholesky_dim (int) - dimension to retain in Cholesky for low-rank reconstruction of ERIs
         integral_path (str) - path to file which integrals to use; assumes hdf5 with 'h0' and 'eri'
+        reduction (str) -  method to rank-reduce ERIs. 'cholesky' or 'eigendecomp'
         verify_eri (bool) - check full cholesky integrals and ERIs are equivalent to epsilon
 
     Returns:
@@ -26,23 +28,16 @@ def compute_lambda(cholesky_dim: int, integral_path: str, verify_eri: bool = Fal
     # Check dims are consistent
     assert [n_orb] * 4 == [*eri.shape]
 
-    # Cholesky factored ints do not exist, so create them
-    cholesky_diagonals, cholesky_lower_tri = np.linalg.eigh(eri.reshape(n_orb **2, n_orb **2))
+    # rank-reduced ints do not exist, so create them
 
-    # Put in descending order
-    cholesky_diagonals = cholesky_diagonals[::-1]
-    cholesky_lower_tri = cholesky_lower_tri[:,::-1]
+    if reduction == 'cholesky':
+        # FIXME: Is this correct? I get different lambda than with eigendecomp
+        L = modified_cholesky(eri.reshape(n_orb**2, n_orb**2),tol=1e-12,verbose=False)
 
-    # Truncate
-    # FIXME: add user-defined threshold (usually 1E-8 is more than enough)
-    idx = np.where(cholesky_diagonals > 1.15E-16)[0]
-    cholesky_diagonals, cholesky_lower_tri = cholesky_diagonals[idx], cholesky_lower_tri[:,idx]
+    elif reduction == 'eigendecomp':
+        L = eigendecomp(eri.reshape(n_orb**2, n_orb**2),tol=1e-12)
 
     #FIXME: Add option to save and read rank-reduced integrals
-
-    # eliminate diagonals D from Cholesky decomposition LDL^T
-    L = np.einsum("ij,j->ij",cholesky_lower_tri,
-        np.sqrt(cholesky_diagonals))
 
     if verify_eri:
         # Make sure we are reading in the integrals correctly ... don't check for large cases (!)
