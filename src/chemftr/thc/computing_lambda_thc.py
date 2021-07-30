@@ -5,7 +5,8 @@ PRX QUANTUM 2, 030305 (2021) Section II. D.
 import numpy as np
 
 
-def compute_thc_lambda(oei: np.ndarray, etaPp: np.ndarray, MPQ: np.ndarray, true_eri: np.ndarray):
+def compute_thc_lambda(oei: np.ndarray, etaPp: np.ndarray, MPQ: np.ndarray, true_eri: np.ndarray,
+                       use_eri_reconstruct_for_v=False):
     """
     Compute lambda thc
 
@@ -38,7 +39,12 @@ def compute_thc_lambda(oei: np.ndarray, etaPp: np.ndarray, MPQ: np.ndarray, true
     lambda_z = np.sum(np.abs(MPQ_normalized)) * 0.5  # Eq. 13
     # NCR: originally Joonho's code add np.einsum('llij->ij', eri_thc)
     # NCR: I don't know how much this matters.
-    T = oei - 0.5 * np.einsum("illj->ij", true_eri) + np.einsum("llij->ij", true_eri)  # Eq. 3 + Eq. 18
+    if use_eri_reconstruct_for_v:
+        # use eri_thc for second coulomb contraction.  This was in the original code which is different than what the
+        # paper says.
+        T = oei - 0.5 * np.einsum("illj->ij", true_eri) + np.einsum("llij->ij", eri_thc)  # Eq. 3 + Eq. 18
+    else:
+        T = oei - 0.5 * np.einsum("illj->ij", true_eri) + np.einsum("llij->ij", true_eri)  # Eq. 3 + Eq. 18
     e, v = np.linalg.eigh(T)
     lambda_T = np.sum(np.abs(e))  # Eq. 19. NOTE: sum over spin orbitals removes 1/2 factor
 
