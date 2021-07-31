@@ -1,7 +1,7 @@
 """ Utilities for FT costing calculations """
 from typing import Tuple
-import numpy as np
 import time
+import numpy as np
 
 
 def QR(L : int, M1 : int) -> Tuple[int, int]:
@@ -118,9 +118,8 @@ def power_two(m: int) -> int:
         return count
     return 0
 
-
+# JJG FIXME: taken from pauxy-qmc
 def modified_cholesky(M, tol=1e-6, verbose=True, cmax=120):
-    # JJG FIXME: taken froom pauxy-qmc
     """Modified cholesky decomposition of matrix.
     See, e.g. [Motta17]_
     Parameters
@@ -167,7 +166,6 @@ def modified_cholesky(M, tol=1e-6, verbose=True, cmax=120):
             print ("# iteration %d: delta_max = %13.8e: time = %13.8e"%info)
 
     return np.array(chol_vecs[:nchol]).T
-
 
 def eigendecomp(M, tol=1.15E-16):
     """ Decompose matrix M into L.L^T where rank(L) < rank(M) to some threshold 
