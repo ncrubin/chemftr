@@ -1,6 +1,5 @@
 """ Routines to grab active space Hamiltonian and do CCSD(T) on the active space """
 from typing import Tuple
-import sys
 import numpy as np
 
 from pyscf import gto, scf, mcscf, ao2mo, cc
@@ -19,8 +18,8 @@ def get_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
         ecore (float) - frozen core electronic energy + nuclear repulsion energy
         cas_alpha, cas_beta (Tuple(int, int)) - number of spin alpha and spin beta electrons in CAS
     """
-    
-    # Only can do RHF or ROHF with mcscf.CASCI 
+
+    # Only can do RHF or ROHF with mcscf.CASCI
     assert isinstance(mf, scf.rhf.RHF)  # ROHF inherits RHF class (i.e. ROHF == RHF but RHF != ROHF)
     cas = mcscf.CASCI(mf, ncas = cas_orbitals, nelecas = cas_electrons)
     h1, ecore = cas.get_h1eff(mo_coeff = avas_orbs)
@@ -34,7 +33,7 @@ def get_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
     assert frozen_electrons % 2 == 0
 
     # Again, recall ROHF == RHF but RHF != ROHF, and we only do either RHF or ROHF
-    if isinstance(mf, scf.rohf.ROHF): 
+    if isinstance(mf, scf.rohf.ROHF):
         frozen_alpha = frozen_electrons // 2
         frozen_beta  = frozen_electrons // 2
         cas_alpha = mf.nelec[0] - frozen_alpha
@@ -49,15 +48,18 @@ def get_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
     return h1, eri, ecore, (cas_alpha, cas_beta)
 
 
-def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int) -> Tuple[float, float, float]:
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
+    -> Tuple[float, float, float]:
     """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
 
     Args:
         h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
-        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis), may be rank-reduced
         ecore (float) - frozen core electronic energy + nuclear repulsion energy
         num_alpha (int) - number of spin alpha electrons in Hamiltonian
         num_beta (int) - number of spin beta electrons in Hamiltonian
+        eri_full (ndarray) - optional 4D tensor containing full (i.e. not rank-reduced) two-body
+            terms (MO basis) for the SCF procedure only
 
     Returns:
         e_scf (float) - SCF energy
@@ -69,15 +71,19 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int) -> Tuple[float, float,
     mol.nelectron = num_alpha + num_beta
     mol.incore_anyway = True
 
+    # If eri_full not provided, use (possibly rank-reduced) ERIs for SCF and SCF energy check
+    if eri_full is None:
+        eri_full = eri
+
     # Assumes Hamiltonian is either RHF or ROHF ... should be OK since UHF will have two h1s, etc.
-    if num_alpha == num_beta: 
+    if num_alpha == num_beta:
         mf = scf.RHF(mol)
         scf_energy = ecore + \
                      2*np.einsum('ii',h1[:num_alpha,:num_alpha]) + \
-                     2*np.einsum('iijj',eri[:num_alpha,:num_alpha,:num_alpha,:num_alpha]) - \
-                       np.einsum('ijji',eri[:num_alpha,:num_alpha,:num_alpha,:num_alpha])
+                     2*np.einsum('iijj',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha]) - \
+                       np.einsum('ijji',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha])
 
-    else: 
+    else:
         mf = scf.ROHF(mol)
         mf.nelec = (num_alpha, num_beta)
         # grab singly and doubly occupied orbitals (assumes high-spin open shell)
@@ -86,19 +92,19 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int) -> Tuple[float, float,
         scf_energy = ecore + \
                      2.0*np.einsum('ii',h1[docc, docc]) + \
                          np.einsum('ii',h1[socc, socc]) + \
-                     2.0*np.einsum('iijj',eri[docc, docc, docc, docc]) - \
-                         np.einsum('ijji',eri[docc, docc, docc, docc]) + \
-                         np.einsum('iijj',eri[socc, socc, docc, docc]) - \
-                     0.5*np.einsum('ijji',eri[socc, docc, docc, socc]) + \
-                         np.einsum('iijj',eri[docc, docc, socc, socc]) - \
-                     0.5*np.einsum('ijji',eri[docc, socc, socc, docc]) + \
-                     0.5*np.einsum('iijj',eri[socc, socc, socc, socc]) - \
-                     0.5*np.einsum('ijji',eri[socc, socc, socc, socc])
+                     2.0*np.einsum('iijj',eri_full[docc, docc, docc, docc]) - \
+                         np.einsum('ijji',eri_full[docc, docc, docc, docc]) + \
+                         np.einsum('iijj',eri_full[socc, socc, docc, docc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, docc, docc, socc]) + \
+                         np.einsum('iijj',eri_full[docc, docc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[docc, socc, socc, docc]) + \
+                     0.5*np.einsum('iijj',eri_full[socc, socc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, socc, socc, socc])
 
     mf.get_hcore  = lambda *args: np.asarray(h1)
     mf.get_ovlp   = lambda *args: np.eye(h1.shape[0])
     mf.energy_nuc = lambda *args: ecore
-    mf._eri = eri # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
+    mf._eri = eri_full # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
 
     mf.conv_tol = 1e-10
     mf.init_guess = '1e'
@@ -110,11 +116,20 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int) -> Tuple[float, float,
     dm = mf.make_rdm1(mol, mf.mo_occ)
     mf = mf.run(dm)
 
+    # Now replace with possibly rank-reduced ERIs for the coupled cluster calculation
+    mf._eri = eri
+
     # Check SCF has not changed by doing restart!
-    assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
+    #print(scf_energy, mf.e_tot)
+    try:
+        assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
+    except AssertionError:
+        print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
+        print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
 
     mycc = cc.CCSD(mf)
     mycc.max_cycle = 300
+    mycc.verbose = 4
     mycc.kernel()
     et = mycc.ccsd_t()
 
