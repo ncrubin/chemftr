@@ -1,27 +1,26 @@
-"""To finish"""
-for M in range(250, 820, 50):
-    f = h5py.File("THC_tensors_approximated/reiher/M_%i_beta_16_eta_10.h5" % M, "r")
-    MPQ = f["MPQ"][()]  # nthc x nthc
-    etaPp = f["etaPp"][()]
-    f.close()
+import chemftr.integrals as int_folder
+from chemftr.thc.computing_lambda_thc import compute_thc_lambda
 
-    CprP = numpy.einsum("Pp,Pr->prP", etaPp, etaPp)  # this is einsum('mp,mq->pqm', etaPp, etaPp)
-    BprQ = numpy.tensordot(CprP, MPQ, axes=([2], [0]))
-    Iapprox = numpy.tensordot(CprP, numpy.transpose(BprQ), axes=([2], [0]))
-    deri = eri - Iapprox
-    res = 0.5 * numpy.sum((deri) ** 2)
+import os
 
-    eri_thc = numpy.einsum("Pp,Pr,Qq,Qs,PQ->prqs", etaPp, etaPp, etaPp, etaPp, MPQ, optimize=True)
+import h5py
 
-    SPQ = etaPp.dot(etaPp.T)
-    cP = numpy.diag(numpy.diag(SPQ))
-    MPQ_normalized = cP.dot(MPQ).dot(cP)
+import numpy as np
 
-    lambda_z = numpy.sum(numpy.abs(MPQ_normalized)) * 0.5
-    T = h0 - 0.5 * numpy.einsum("illj->ij", eri) + numpy.einsum("llij->ij", eri_thc)
-    e, v = numpy.linalg.eigh(T)
-    lambda_T = numpy.sum(numpy.abs(e))
 
-    lambda_tot = lambda_z + lambda_T
+def test_lambda():
+    integral_path = int_folder.__file__.replace('__init__.py', '')
+    thc_factor_file = os.path.join(integral_path, 'M_250_beta_16_eta_10.h5')
+    eri_file = os.path.join(integral_path,'eri_reiher.h5')
+    with h5py.File(thc_factor_file, 'r') as fid:
+        MPQ = fid['MPQ'][...]
+        etaPp = fid['etaPp'][...]
 
-    print(M, numpy.sqrt(res), res, lambda_T, lambda_z, lambda_tot)
+    with h5py.File(eri_file, 'r') as fid:
+        eri = fid['eri'][...]
+        h0 = fid['h0'][...]
+
+    nthc, sqrt_res, res, lambda_T, lambda_z, lambda_tot = \
+        compute_thc_lambda(oei=h0, etaPp=etaPp, MPQ=MPQ, true_eri=eri, use_eri_reconstruct_for_v=False)
+    assert nthc == 250
+    assert np.isclose(np.round(lambda_tot), 294)

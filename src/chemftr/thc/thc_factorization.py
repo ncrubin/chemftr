@@ -227,10 +227,13 @@ def lbfgsb_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed
 
 
 def adagrad_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed=None,
-                    stepsize=0.01, momentum=0.9,  maxiter=1_000_000, gtol=1.0E-5):
+                    stepsize=0.01, momentum=0.9,  maxiter=50_000, gtol=1.0E-5):
     """
     THC opt usually starts with BFGS and then is completed with Adagrad or another
-    first order solver.  This  function implements an Adagrad optimization
+    first order solver.  This  function implements an Adagrad optimization.
+
+    Optimization runs for 50 K iterations.  This is the ONLY stopping cirteria
+    used in the FT-THC paper by Lee et al.
     """
     # initialize chkfile name if one isn't set
     if chkfile_name is None:
