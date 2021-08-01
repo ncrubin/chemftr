@@ -1,8 +1,8 @@
 """ Compute lambda for single low rank factorization method of Berry, et al """
 from typing import Tuple
 import numpy as np
-import h5py
-from chemftr.util import modified_cholesky, eigendecomp
+from chemftr.rank_reduce import single_factorize
+from chemftr.util import read_cas
 
 
 def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eigendecomp', \
@@ -20,47 +20,23 @@ def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eige
         lambda_tot (float) - lambda value for the single factorized Hamiltonian
     """
 
-    with h5py.File(integral_path, "r") as f:
-        eri = np.asarray(f['eri'][()])
-        h0  = np.asarray(f['h0'][()])
+    # read in integrals, we don't care about num_electrons here so pass in dummy variables
+    h1, eri_full, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
 
-    n_orb = len(h0)  # number orbitals
-    # Check dims are consistent
-    assert [n_orb] * 4 == [*eri.shape]
-
-    # rank-reduced ints do not exist, so create them
-
-    if reduction == 'cholesky':
-        # FIXME: Is this correct? I get different lambda than with eigendecomp
-        L = modified_cholesky(eri.reshape(n_orb**2, n_orb**2),tol=1e-12,verbose=False)
-
-    elif reduction == 'eigendecomp':
-        L = eigendecomp(eri.reshape(n_orb**2, n_orb**2),tol=1e-12)
-
-    #FIXME: Add option to save and read rank-reduced integrals
-
-    if verify_eri:
-        # Make sure we are reading in the integrals correctly ... don't check for large cases (!)
-        eri_new = np.einsum('ik,kj->ij',L,L.T,optimize=True)
-        assert np.allclose(eri_new.flatten(),eri.flatten())
-
-    # Reshape for lambda calcs
-    L = L.reshape(n_orb, n_orb, -1)
+    # compute the rank-reduced eri tensors (LR.LR^T ~= ERI)
+    LR, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
 
     # Effective one electron operator contribution
-    T = h0 - 0.5 * np.einsum("pqqs->ps", eri, optimize=True) +\
-        np.einsum("pqrr->pq", eri, optimize = True)
+    T = h1 - 0.5 * np.einsum("pqqs->ps", eri_full, optimize=True) +\
+        np.einsum("pqrr->pq", eri_full, optimize = True)
 
     lambda_T = np.sum(np.abs(T))
-
-    # Do rank-reduction of ERIs using cholesky_dim vectors
-    LR = L[:,:,:cholesky_dim]
 
     # Two electron operator contributions
     lambda_W = 0.25 * np.einsum("ijP,klP->",np.abs(LR), np.abs(LR), optimize=True)
     lambda_tot = lambda_T + lambda_W
 
-    return n_orb * 2, lambda_tot  #  return number spin orbitals from spatial and combined lambda
+    return h1.shape[0] * 2, lambda_tot  #  return num spin orbitals from spatial and combined lambda
 
 
 if __name__ == '__main__':

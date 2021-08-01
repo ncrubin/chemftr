@@ -1,7 +1,9 @@
 """ Utilities for FT costing calculations """
-from typing import Tuple
-import time
+from typing import Tuple, Optional
+import sys
+import h5py
 import numpy as np
+from pyscf import gto, scf, mcscf, ao2mo, cc
 
 
 def QR(L : int, M1 : int) -> Tuple[int, int]:
@@ -40,7 +42,7 @@ def QR2(L1: int, L2: int, M1: int) -> Tuple[int, int, int]:
        val_opt (int) - minimal (optimal) cost of QROM
     """
 
-    k1_opt, k2_opt = 0, 0 
+    k1_opt, k2_opt = 0, 0
     val_opt = 1e50
     # Doing this as a stupid loop for now, worth refactoring but cost is quick regardless
     # Biggest concern is if k1 / k2 range is not large enough!
@@ -91,7 +93,7 @@ def QI2(L1: int, L2: int) -> Tuple[int, int, int]:
        val_opt (int) - minimal (optimal) cost of inverse QROM with two registers
     """
 
-    k1_opt, k2_opt = 0, 0 
+    k1_opt, k2_opt = 0, 0
     val_opt = 1e50
     # Doing this as a stupid loop for now, worth refactoring but cost is quick regardless
     # Biggest concern is if k1 / k2 range is not large enough!
@@ -118,79 +120,271 @@ def power_two(m: int) -> int:
         return count
     return 0
 
-# JJG FIXME: taken from pauxy-qmc
-def modified_cholesky(M, tol=1e-6, verbose=True, cmax=120):
-    """Modified cholesky decomposition of matrix.
-    See, e.g. [Motta17]_
-    Parameters
-    ----------
-    M : :class:`numpy.ndarray`
-        Positive semi-definite, symmetric matrix.
-    tol : float
-        Accuracy desired.
-    verbose : bool
-        If true print out convergence progress.
-    Returns
-    -------
-    chol_vecs : :class:`numpy.ndarray`
-        Matrix of cholesky vectors.
-    """
-    # matrix of residuals.
-    assert len(M.shape) == 2
-    delta = np.copy(M.diagonal())
-    nchol_max = int(cmax*M.shape[0]**0.5)
-    # index of largest diagonal element of residual matrix.
-    nu = np.argmax(np.abs(delta))
-    delta_max = delta[nu]
-    if verbose:
-        print ("# max number of cholesky vectors = %d"%nchol_max)
-        print ("# iteration %d: delta_max = %f"%(0, delta_max.real))
-    # Store for current approximation to input matrix.
-    Mapprox = np.zeros(M.shape[0], dtype=M.dtype)
-    chol_vecs = np.zeros((nchol_max, M.shape[0]), dtype=M.dtype)
-    nchol = 0
-    chol_vecs[0] = np.copy(M[:,nu])/delta_max**0.5
-    while abs(delta_max) > tol:
-        # Update cholesky vector
-        start = time.time()
-        Mapprox += chol_vecs[nchol]*chol_vecs[nchol].conj()
-        delta = M.diagonal() - Mapprox
-        nu = np.argmax(np.abs(delta))
-        delta_max = np.abs(delta[nu])
-        nchol += 1
-        Munu0 = np.dot(chol_vecs[:nchol,nu].conj(), chol_vecs[:nchol,:])
-        chol_vecs[nchol] = (M[:,nu] - Munu0) / (delta_max)**0.5
-        if verbose:
-            step_time = time.time() - start
-            info = (nchol, delta_max, step_time)
-            print ("# iteration %d: delta_max = %13.8e: time = %13.8e"%info)
-
-    return np.array(chol_vecs[:nchol]).T
-
-def eigendecomp(M, tol=1.15E-16):
-    """ Decompose matrix M into L.L^T where rank(L) < rank(M) to some threshold 
+def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[int] = None):
+    """ Read CAS Hamiltonian from pre-computed HD5 file.
 
     Args:
-       M (np.ndarray) - (N x N) positive semi-definite matrix to be decomposed
-       tol (float) - eigenpairs with eigenvalue above tol will be kept
+        mf (PySCF mean field object) - instantiation of PySCF mean field method class
+        num_alpha (int, optional) - number of spin up electrons in CAS space
+        num_beta (int, optional) - number of spin down electrons in CAS space
 
     Returns:
-       L (np.ndarray) - (K x N) array such that K <= N and L.L^T = M 
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha, num_beta (Tuple(int, int)) - number of spin alpha and spin beta electrons in CAS
     """
-    eigenvalues, eigenvectors = np.linalg.eigh(M)
 
-    # Put in descending order
-    eigenvalues = eigenvalues[::-1]
-    eigenvectors = eigenvectors[:,::-1]
+    with h5py.File(integral_path, "r") as f:
+        eri = np.asarray(f['eri'][()])
+        #FIXME: h1 is sometimes called different things. We should make this consistent
+        try:
+            h1  = np.asarray(f['h0'][()])
+        except KeyError:
+            h1  = np.asarray(f['hcore'][()])
+        # ecore sometimes exists, and sometimes as enuc (no frozen electrons) ... set to zero if N/A
+        try:
+            ecore = float(f['ecore'][()])
+        except KeyError:
+            try:
+                ecore = float(f['enuc'][()])
+            except KeyError:
+                ecore = 0.0
+        # attempt to read the number of spin up and spin down electrons if not input directly
+        # FIXME: make hd5 key convention consistent
+        if (num_alpha is None) or (num_beta is None):
+            try:
+                num_alpha = int(f['active_nalpha'][()])
+            except KeyError:
+                sys.exit("No values found on file for num_alpha (key: 'active_nalpha' in h5). " + \
+                         "Try passing in a value for num_alpha, or re-check integral file.")
+            try:
+                num_beta = int(f['active_nbeta'][()])
+            except KeyError:
+                sys.exit("No values found on file for num_beta (key: 'active_nbeta' in h5). " + \
+                         "Try passing in a value for num_beta, or re-check integral file.")
 
-    # Truncate
-    idx = np.where(eigenvalues > tol)[0]
-    eigenvalues, eigenvectors = eigenvalues[idx], eigenvectors[:,idx]
+    n_orb = len(h1)  # number orbitals
+    assert [n_orb] * 4 == [*eri.shape]  # check dims are consistent
 
-    # eliminate eigenvlaues from eigendecomposition 
-    L = np.einsum("ij,j->ij",eigenvectors,
-        np.sqrt(eigenvalues))
+    return h1, eri, ecore, (num_alpha, num_beta)
 
-    return L
+def gen_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
+    """ Generate CAS Hamiltonian given a PySCF mean field object
+
+    Args:
+        mf (PySCF mean field object) - instantiation of PySCF mean field method class
+        cas_orbitals (int) - number of orbitals in CAS space
+        cas_electrons (int) - number of electrons in CAS space
+
+    Returns:
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha, num_beta (Tuple(int, int)) - number of spin alpha and spin beta electrons in CAS
+    """
+
+    # Only can do RHF or ROHF with mcscf.CASCI
+    assert isinstance(mf, scf.rhf.RHF)  # ROHF inherits RHF class (i.e. ROHF == RHF but RHF != ROHF)
+    cas = mcscf.CASCI(mf, ncas = cas_orbitals, nelecas = cas_electrons)
+    h1, ecore = cas.get_h1eff(mo_coeff = avas_orbs)
+    eri = cas.get_h2cas(mo_coeff = avas_orbs)
+    eri = ao2mo.restore('s1', eri, h1.shape[0])  # chemist convention (11|22)
+    ecore = float(ecore)
+
+    # Sanity checks and active space info
+    total_electrons = mf.mol.nelectron
+    frozen_electrons  = total_electrons - cas_electrons
+    assert frozen_electrons % 2 == 0
+
+    # Again, recall ROHF == RHF but RHF != ROHF, and we only do either RHF or ROHF
+    if isinstance(mf, scf.rohf.ROHF):
+        frozen_alpha = frozen_electrons // 2
+        frozen_beta  = frozen_electrons // 2
+        num_alpha = mf.nelec[0] - frozen_alpha
+        num_beta  = mf.nelec[1] - frozen_beta
+        assert np.isclose(num_beta + num_alpha, cas_electrons)
+
+    else:
+        assert cas_electrons % 2 == 0
+        num_alpha = cas_electrons // 2
+        num_beta  = cas_electrons // 2
+
+    return h1, eri, ecore, (num_alpha, num_beta)
 
 
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
+    -> Tuple[float, float, float]:
+    """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
+
+    Args:
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis), may be rank-reduced
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha (int) - number of spin alpha electrons in Hamiltonian
+        num_beta (int) - number of spin beta electrons in Hamiltonian
+        eri_full (ndarray) - optional 4D tensor containing full (i.e. not rank-reduced) two-body
+            terms (MO basis) for the SCF procedure only
+
+    Returns:
+        e_scf (float) - SCF energy
+        e_cor (float) - Correlation energy from CCSD(T)
+        e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
+    """
+
+    mol = gto.M()
+    mol.nelectron = num_alpha + num_beta
+    mol.incore_anyway = True
+
+    # If eri_full not provided, use (possibly rank-reduced) ERIs for SCF and SCF energy check
+    if eri_full is None:
+        eri_full = eri
+
+    # Assumes Hamiltonian is either RHF or ROHF ... should be OK since UHF will have two h1s, etc.
+    if num_alpha == num_beta:
+        mf = scf.RHF(mol)
+        scf_energy = ecore + \
+                     2*np.einsum('ii',h1[:num_alpha,:num_alpha]) + \
+                     2*np.einsum('iijj',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha]) - \
+                       np.einsum('ijji',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha])
+
+    else:
+        mf = scf.ROHF(mol)
+        mf.nelec = (num_alpha, num_beta)
+        # grab singly and doubly occupied orbitals (assumes high-spin open shell)
+        docc = slice(None                    , min(num_alpha, num_beta))
+        socc = slice(min(num_alpha, num_beta), max(num_alpha, num_beta))
+        scf_energy = ecore + \
+                     2.0*np.einsum('ii',h1[docc, docc]) + \
+                         np.einsum('ii',h1[socc, socc]) + \
+                     2.0*np.einsum('iijj',eri_full[docc, docc, docc, docc]) - \
+                         np.einsum('ijji',eri_full[docc, docc, docc, docc]) + \
+                         np.einsum('iijj',eri_full[socc, socc, docc, docc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, docc, docc, socc]) + \
+                         np.einsum('iijj',eri_full[docc, docc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[docc, socc, socc, docc]) + \
+                     0.5*np.einsum('iijj',eri_full[socc, socc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, socc, socc, socc])
+
+    mf.get_hcore  = lambda *args: np.asarray(h1)
+    mf.get_ovlp   = lambda *args: np.eye(h1.shape[0])
+    mf.energy_nuc = lambda *args: ecore
+    mf._eri = eri_full # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
+
+    mf.conv_tol = 1e-10
+    mf.init_guess = '1e'
+    mf.kernel()
+    mol = mf.stability()[0]
+    dm = mf.make_rdm1(mol, mf.mo_occ)
+    mf = mf.run(dm)
+    mol = mf.stability()[0]
+    dm = mf.make_rdm1(mol, mf.mo_occ)
+    mf = mf.run(dm)
+
+    # Now replace with possibly rank-reduced ERIs for the coupled cluster calculation
+    mf._eri = eri
+
+    # Check SCF has not changed by doing restart!
+    #print(scf_energy, mf.e_tot)
+    try:
+        assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
+    except AssertionError:
+        print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
+        print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
+
+    mycc = cc.CCSD(mf)
+    mycc.max_cycle = 300
+    mycc.verbose = 4
+    mycc.kernel()
+    et = mycc.ccsd_t()
+
+    e_scf = mf.e_tot
+    e_cor = mycc.e_corr + et
+    e_tot = e_scf + e_cor
+
+    print("E(SCF, ints): ", scf_energy)
+    print("E(SCF):       ", e_scf)
+    print("E(cor):       ", e_cor)
+    print("Total energy: ", e_tot)
+    return e_scf, e_cor, e_tot
+
+
+if __name__ == '__main__':
+
+    print('Doing: RHF')
+    mol = gto.Mole()
+    mol.verbose = 0
+    mol.atom = 'H 0 0 0; F 0 0 1.1'
+    mol.charge = 0
+    mol.spin = 0
+    mol.basis = 'ccpvtz'
+    mol.symmetry = False
+    mol.build()
+
+    mf = scf.RHF(mol)
+    mf.init_guess = 'mindo'
+    mf.conv_tol = 1e-10
+    mf.kernel()
+    mo1 = mf.stability()[0]
+    dm1 = mf.make_rdm1(mo1, mf.mo_occ)
+    mf = mf.run(dm1)
+
+    mycc = cc.CCSD(mf)
+    mycc.max_cycle = 300
+    mycc.kernel()
+    et = mycc.ccsd_t()
+
+    print("E(SCF):       ", mf.e_tot)
+    print("E(cor):       ", mycc.e_corr)
+    print("E(T):         ", et)
+    print("Total energy: ", mycc.e_corr + mf.e_tot + et)
+
+    n_elec = mol.nelectron
+    n_orb = mf.mo_coeff[0].shape[-1]
+
+    # Now repeat, but freeze two core electrons
+    frozen = 2
+    n_elec -= frozen
+    n_orb -= frozen//2
+    h1, eri, ecore, (num_alpha, num_beta) = gen_cas(mf, n_orb, n_elec)
+
+    ccsd_t(h1, eri, ecore, num_alpha, num_beta)
+
+    print('\nDoing: ROHF')
+    mol = gto.Mole()
+    mol.verbose = 0
+    mol.atom = 'H 0 0 0; F 0 0 1.1'
+    mol.charge = 0
+    mol.spin = 2
+    mol.basis = 'ccpvtz'
+    mol.symmetry = False
+    mol.build()
+
+    mf = scf.ROHF(mol)
+    mf.init_guess = 'mindo'
+    mf.conv_tol = 1e-10
+    mf.kernel()
+    mo1 = mf.stability()[0]
+    dm1 = mf.make_rdm1(mo1, mf.mo_occ)
+    mf = mf.run(dm1)
+
+    mycc = cc.CCSD(mf)
+    mycc.max_cycle = 300
+    mycc.kernel()
+    et = mycc.ccsd_t()
+
+    print("E(SCF):       ", mf.e_tot)
+    print("E(cor):       ", mycc.e_corr)
+    print("E(T):         ", et)
+    print("Total energy: ", mycc.e_corr + mf.e_tot + et)
+
+    n_elec = mol.nelectron
+    n_orb = mf.mo_coeff[0].shape[-1]
+
+    # Now repeat, but freeze two core electrons
+    frozen = 2
+    n_elec -= frozen
+    n_orb -= frozen//2
+    h1, eri, ecore, (num_alpha, num_beta) = gen_cas(mf, n_orb, n_elec)
+
+    ccsd_t(h1, eri, ecore, num_alpha, num_beta)

@@ -2,7 +2,8 @@
 from typing import Tuple
 import numpy as np
 import h5py
-from chemftr.util import modified_cholesky, eigendecomp
+from chemftr.rank_reduce import modified_cholesky, eigendecomp
+from chemftr.util import read_cas
 
 
 def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendecomp', \
@@ -22,13 +23,10 @@ def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendec
         Lxi (int) - the total number of eigenvectors
     """
 
-    with h5py.File(integral_path, "r") as f:
-        eri = np.asarray(f['eri'][()])
-        h0  = np.asarray(f['h0'][()])
+    h1, eri, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
 
-    n_orb = len(h0)  # number orbitals
-    # Check dims are consistent
-    assert [n_orb] * 4 == [*eri.shape]
+    # rank-reduced ints do not exist, so create them
+    n_orb = h1.shape[0]  # number of orbitals
 
     # rank-reduced ints do not exist, so create them
 
@@ -51,7 +49,7 @@ def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendec
 
     nchol_max = max(L.shape)
 
-    T = h0 - 0.5 * np.einsum("illj->ij", eri) + np.einsum("llij->ij", eri)
+    T = h1 - 0.5 * np.einsum("illj->ij", eri) + np.einsum("llij->ij", eri)
     e, v = np.linalg.eigh(T)
     lambda_T = np.sum(np.abs(e))
 

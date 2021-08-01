@@ -40,7 +40,8 @@ REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 # Reference calculation (dim = -1 is ~ full cholesky / exact ERIs)
 # run silently
 sys.stdout = NullIO()
-escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=-1,integral_path=REIHER_INTS,nalpha=27,nbeta=27)
+escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=-1,integral_path=REIHER_INTS,\
+                                     num_alpha=27,num_beta=27)
 sys.stdout = sys.__stdout__
 
 exact_ecor = ecor
@@ -55,7 +56,7 @@ for rank in range(50,401,25):
     sys.stdout = NullIO()
     n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=REIHER_INTS)
     escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=REIHER_INTS,
-                                         nalpha=27,nbeta=27)
+                                         num_alpha=27,num_beta=27)
     error = (ecor - exact_ecor)*1E3  # to mEh
     sys.stdout = sys.__stdout__
     print("{:^12} {:^12.1f} {:^24.2f}".format(rank,lam,error))
