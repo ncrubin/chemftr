@@ -37,10 +37,10 @@ DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 
-# Reference calculation (dim = -1 is ~ full cholesky / exact ERIs)
+# Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
 sys.stdout = NullIO()
-escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=-1,integral_path=REIHER_INTS,\
+escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=REIHER_INTS,\
                                      num_alpha=27,num_beta=27)
 sys.stdout = sys.__stdout__
 

@@ -24,7 +24,7 @@ def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eige
     h1, eri_full, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
 
     # compute the rank-reduced eri tensors (LR.LR^T ~= ERI)
-    LR, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
+    _, LR = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
 
     # Effective one electron operator contribution
     T = h1 - 0.5 * np.einsum("pqqs->ps", eri_full, optimize=True) +\

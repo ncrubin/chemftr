@@ -9,11 +9,12 @@ def single_factorize(eri_full, cholesky_dim, reduction='eigendecomp',verify_eri=
     Args:
        eri_full (np.ndarray) - 4D (N x N x N x N) full ERI tensor
        cholesky_dim (int) - number of vectors to retain in ERI rank-reduction procedure
+       reduction (str) - type of initial rank reduction on ERI ('cholesky' or 'eigendecomp')
        verify_eri (bool) - verify that initial decomposition can reconstruct the ERI tensor
 
     Returns:
-       LR (np.ndarray) - 3D (N x N x cholesky_dim) tensor containing vectors from rank-reduction
        eri_rr (np.ndarray) - 4D approximate ERI tensor reconstructed from LR vectors
+       LR (np.ndarray) - 3D (N x N x cholesky_dim) tensor containing vectors from rank-reduction
     """
     n_orb = eri_full.shape[0]
     assert n_orb**4 == len(eri_full.flatten())
@@ -30,14 +31,76 @@ def single_factorize(eri_full, cholesky_dim, reduction='eigendecomp',verify_eri=
         assert np.allclose(eri_rr.flatten(),eri_full.flatten())
 
     # Do rank-reduction of ERIs using cholesky_dim vectors
-    LR = L[:,:cholesky_dim]
+
+    if cholesky_dim is None:
+        LR = L[:,:]
+    else:
+        LR = L[:,:cholesky_dim]
     eri_rr = np.einsum('ik,kj->ij',LR,LR.T,optimize=True)
     eri_rr = eri_rr.reshape(n_orb, n_orb, n_orb, n_orb)
-    eri_full = eri_full.reshape(n_orb, n_orb, n_orb, n_orb)
-    LR = LR.reshape(n_orb, n_orb, cholesky_dim)
+    LR = LR.reshape(n_orb, n_orb, -1)
+    if cholesky_dim is not None:
+        assert LR.shape[2] == cholesky_dim
     #print("ERI delta = ", np.linalg.norm(eri_rr - eri_full))
 
-    return LR, eri_rr
+    return eri_rr, LR
+
+def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
+    """ Do double factorization of the ERI tensor
+
+    Args:
+       eri_full (np.ndarray) - 4D (N x N x N x N) full ERI tensor
+       thresh (float) - threshold for double factorization
+       reduction (str) - type of initial rank reduction on ERI ('cholesky' or 'eigendecomp')
+       verify_eri (bool) - verify that initial decomposition can reconstruct the ERI tensor
+
+    Returns:
+       eri_rr (np.ndarray) - 4D approximate ERI tensor reconstructed from LR vectors
+       LR (np.ndarray) - 3D (N x N x cholesky_dim) tensor containing vectors from rank-reduction
+    """
+    _, L = single_factorize(eri_full, cholesky_dim=None, reduction=reduction, verify_eri=verify_eri)
+
+    n_orb = eri_full.shape[0]
+    assert n_orb**4 == len(eri_full.flatten())
+
+    nchol_max = max(L.shape)
+
+    # double factorized eris
+    eri_rr = np.zeros_like(eri_full)
+
+    lambda_F = 0.0
+
+    M = 0 # rolling number of eigenvectors
+    for R in range(nchol_max):
+        Lij = L[:,:, R]
+        e, v = np.linalg.eigh(Lij)
+        normSC = np.sum(np.abs(e))
+
+        truncation = normSC * np.abs(e)
+
+        idx = truncation > thresh
+        plus  = np.sum(idx)
+        M += plus
+
+        if plus == 0:
+            break
+
+        e_selected = np.diag(e[idx])
+        v_selected = v[:,idx]
+
+        Lij_selected = v_selected.dot(e_selected).dot(v_selected.T)
+
+        eri_rr += np.einsum("ij,kl->ijkl", Lij_selected, Lij_selected, optimize=True)
+
+        normSC = 0.25 * np.sum(np.abs(e_selected))**2
+        lambda_F += normSC
+
+    # incoherent error
+    # ein = np.sqrt(np.sum(np.abs(eri - H_df)**2))
+
+    #print("ERI error DF: ", np.linalg.norm(eri_rr - eri_full))
+
+    return eri_rr, lambda_F, R, M
 
 
 # JJG FIXME: taken from pauxy-qmc

@@ -23,7 +23,7 @@ def compute_ccsd_t(cholesky_dim: int, integral_path: str, num_alpha = None, num_
     h1, eri_full, ecore, (num_alpha, num_beta) = read_cas(integral_path, num_alpha, num_beta)
 
     # compute the rank-reduced eri tensors (LR.LR^T = eri_rr ~= eri_full)
-    _, eri_rr = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
+    eri_rr, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
 
     e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full)
 
@@ -34,8 +34,8 @@ if __name__ == '__main__':
 
     NAME = '../integrals/eri_reiher.h5'
     VERIFY=True
-    escf, ecorr, etot = compute_ccsd_t(cholesky_dim=-1,integral_path=NAME,num_alpha=27,num_beta=27,
-                                       verify_eri=VERIFY)
+    escf, ecorr, etot = compute_ccsd_t(cholesky_dim=None,integral_path=NAME,
+                                      num_alpha=27,num_beta=27,verify_eri=VERIFY)
     exact_energy = ecorr
     appx_energy = []
     ranks = [100]
