@@ -1,4 +1,4 @@
-""" Compute CCSD(T) for single low rank factorization method of Berry, et al """
+""" Compute CCSD(T) for double low rank factorization method of von Burg, et al. """
 from typing import Tuple
 import numpy as np
 from chemftr.rank_reduce import double_factorize
@@ -7,7 +7,7 @@ from chemftr.util import read_cas, ccsd_t
 
 def compute_ccsd_t(thresh: float, integral_path: str, num_alpha = None, num_beta = None, \
     reduction: str = 'eigendecomp', verify_eri: bool = False) -> Tuple[int, float]:
-    """ Compute CCSD(T) energy for Hamiltonian using SF method of Berry, et al.
+    """ Compute CCSD(T) energy for Hamiltonian using DF method of von Burg, et al.
 
     Args:
         thresh (float) - threshold for double factorization truncationn strategy 
@@ -21,14 +21,10 @@ def compute_ccsd_t(thresh: float, integral_path: str, num_alpha = None, num_beta
         e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
     """
     h1, eri_full, ecore, (num_alpha, num_beta) = read_cas(integral_path, num_alpha, num_beta)
-
-    # compute the rank-reduced eri tensors (LR.LR^T = eri_rr ~= eri_full)
     eri_rr, _, _, _ = double_factorize(eri_full, thresh, reduction, verify_eri)
-
     e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full)
 
     return e_scf, e_cor, e_tot
-
 
 if __name__ == '__main__':
 
