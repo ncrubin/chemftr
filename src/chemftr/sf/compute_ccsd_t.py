@@ -20,7 +20,7 @@ def compute_ccsd_t(cholesky_dim: int, integral_path: str, num_alpha = None, num_
         e_cor (float) - Correlation energy from CCSD(T)
         e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
     """
-    h1, eri_full, ecore, (num_alpha, num_beta) = read_cas(integral_path, num_alpha, num_beta)
+    h1, eri_full, ecore, num_alpha, num_beta = read_cas(integral_path, num_alpha, num_beta)
 
     # compute the rank-reduced eri tensors (LR.LR^T = eri_rr ~= eri_full)
     eri_rr, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)

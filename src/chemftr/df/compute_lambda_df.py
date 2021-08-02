@@ -22,7 +22,7 @@ def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendec
         Lxi (int) - the total number of eigenvectors
     """
 
-    h1, eri_full, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
+    h1, eri_full, _, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
 
     # rank-reduced ints do not exist, so create them
     n_orb = h1.shape[0]  # number of orbitals

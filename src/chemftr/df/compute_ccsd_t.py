@@ -20,7 +20,7 @@ def compute_ccsd_t(thresh: float, integral_path: str, num_alpha = None, num_beta
         e_cor (float) - Correlation energy from CCSD(T)
         e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
     """
-    h1, eri_full, ecore, (num_alpha, num_beta) = read_cas(integral_path, num_alpha, num_beta)
+    h1, eri_full, ecore, num_alpha, num_beta = read_cas(integral_path, num_alpha, num_beta)
     eri_rr, _, _, _ = double_factorize(eri_full, thresh, reduction, verify_eri)
     e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full)
 

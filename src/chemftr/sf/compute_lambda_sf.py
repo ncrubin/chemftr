@@ -21,7 +21,7 @@ def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eige
     """
 
     # read in integrals, we don't care about num_electrons here so pass in dummy variables
-    h1, eri_full, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
+    h1, eri_full, _, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
 
     # compute the rank-reduced eri tensors (LR.LR^T ~= ERI)
     _, LR = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)

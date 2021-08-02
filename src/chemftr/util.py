@@ -124,7 +124,7 @@ def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[
     """ Read CAS Hamiltonian from pre-computed HD5 file.
 
     Args:
-        mf (PySCF mean field object) - instantiation of PySCF mean field method class
+        integral_path (str) - path to hd5 file containing CAS one and two body terms 
         num_alpha (int, optional) - number of spin up electrons in CAS space
         num_beta (int, optional) - number of spin down electrons in CAS space
 
@@ -132,7 +132,8 @@ def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[
         h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
         eri (ndarray) - 4D tensor containing two-body terms (MO basis)
         ecore (float) - frozen core electronic energy + nuclear repulsion energy
-        num_alpha, num_beta (Tuple(int, int)) - number of spin alpha and spin beta electrons in CAS
+        num_alpha (int) - number of spin up electrons in CAS space
+        num_beta (int) - number of spin down electrons in CAS space
     """
 
     with h5py.File(integral_path, "r") as f:
@@ -167,7 +168,7 @@ def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[
     n_orb = len(h1)  # number orbitals
     assert [n_orb] * 4 == [*eri.shape]  # check dims are consistent
 
-    return h1, eri, ecore, (num_alpha, num_beta)
+    return h1, eri, ecore, num_alpha, num_beta
 
 def gen_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
     """ Generate CAS Hamiltonian given a PySCF mean field object
@@ -181,7 +182,8 @@ def gen_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
         h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
         eri (ndarray) - 4D tensor containing two-body terms (MO basis)
         ecore (float) - frozen core electronic energy + nuclear repulsion energy
-        num_alpha, num_beta (Tuple(int, int)) - number of spin alpha and spin beta electrons in CAS
+        num_alpha (int) - number of spin up electrons in CAS space
+        num_beta (int) - number of spin down electrons in CAS space
     """
 
     # Only can do RHF or ROHF with mcscf.CASCI
@@ -210,8 +212,25 @@ def gen_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
         num_alpha = cas_electrons // 2
         num_beta  = cas_electrons // 2
 
-    return h1, eri, ecore, (num_alpha, num_beta)
+    return h1, eri, ecore, num_alpha, num_beta
 
+def save_cas(fname, h1, eri, ecore, num_alpha, num_beta):
+    """ Save CAS Hamiltonian to HD5 file.
+
+    Args:
+        fname (str) - path to hd5 file to be created containing CAS one and two body terms 
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha (int) - number of spin alpha electrons in Hamiltonian
+        num_beta (int) - number of spin beta electrons in Hamiltonian
+    """
+    with h5py.File(fname, 'w') as fid:
+        fid.create_dataset('ecore', data=float(ecore), dtype=float)
+        fid.create_dataset('h0', data=h1)  # note the name change to be consistent with THC paper
+        fid.create_dataset('eri', data=eri)
+        fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
+        fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
 def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
     -> Tuple[float, float, float]:
@@ -346,7 +365,7 @@ if __name__ == '__main__':
     frozen = 2
     n_elec -= frozen
     n_orb -= frozen//2
-    h1, eri, ecore, (num_alpha, num_beta) = gen_cas(mf, n_orb, n_elec)
+    h1, eri, ecore, num_alpha, num_beta = gen_cas(mf, n_orb, n_elec)
 
     ccsd_t(h1, eri, ecore, num_alpha, num_beta)
 
@@ -385,6 +404,6 @@ if __name__ == '__main__':
     frozen = 2
     n_elec -= frozen
     n_orb -= frozen//2
-    h1, eri, ecore, (num_alpha, num_beta) = gen_cas(mf, n_orb, n_elec)
+    h1, eri, ecore, num_alpha, num_beta = gen_cas(mf, n_orb, n_elec)
 
     ccsd_t(h1, eri, ecore, num_alpha, num_beta)
