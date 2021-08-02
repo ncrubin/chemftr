@@ -25,7 +25,7 @@ Table XI. Single low rank factorization data for
 ================================================
 """ 
 import sys
-from chemftr import sf, df
+from chemftr import sf
 from io import StringIO
 
 class NullIO(StringIO):
