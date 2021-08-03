@@ -234,8 +234,8 @@ def save_cas(fname, h1, eri, ecore, num_alpha, num_beta):
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
 # FIXME: Remove the use_kernel option after done debugging
-def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=False) \
-    -> Tuple[float, float, float]:
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=False, \
+    no_triples=False) -> Tuple[float, float, float]:
     """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
 
     Args:
@@ -337,7 +337,11 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     mycc.diis_start_cycle = 4
     mycc.verbose = 4
     mycc.kernel()
-    et = mycc.ccsd_t()
+
+    if no_triples:
+        et = 0.0
+    else:
+        et = mycc.ccsd_t()
 
     e_scf = scf_energy 
     e_cor = mycc.e_corr + et
@@ -377,80 +381,92 @@ class RunSilent(object):
 
 if __name__ == '__main__':
 
-    print('Doing: RHF')
-    mol = gto.Mole()
-    mol.verbose = 0
-    mol.atom = 'H 0 0 0; F 0 0 1.1'
-    mol.charge = 0
-    mol.spin = 0
-    mol.basis = 'ccpvtz'
-    mol.symmetry = False
-    mol.build()
+    print("chemftr full CCSD(T) from h1/eri/ecore tensors vs regular PySCF CCSD(T) ")
+    for scf_type in ['rhf', 'rohf']:
+        mol = gto.Mole()
+        mol.atom = 'H 0 0 0; F 0 0 1.1'
+        mol.charge = 0
+        if scf_type == 'rhf':
+            mol.spin = 0
+        elif scf_type == 'rohf':
+            mol.spin = 2
+        mol.basis = 'ccpvtz'
+        mol.symmetry = False
+        mol.build()
 
-    mf = scf.RHF(mol)
-    mf.init_guess = 'mindo'
-    mf.conv_tol = 1e-10
-    mf.kernel()
-    mo1 = mf.stability()[0]
-    dm1 = mf.make_rdm1(mo1, mf.mo_occ)
-    mf = mf.run(dm1)
+        if scf_type == 'rhf':
+            mf = scf.RHF(mol)
+        elif scf_type == 'rohf':
+            mf = scf.ROHF(mol) 
 
-    mycc = cc.CCSD(mf)
-    mycc.max_cycle = 300
-    mycc.kernel()
-    et = mycc.ccsd_t()
+        mf.init_guess = 'mindo'
+        mf.conv_tol = 1e-10
+        mf.kernel()
+        mo1 = mf.stability()[0]
+        dm1 = mf.make_rdm1(mo1, mf.mo_occ)
+        mf = mf.run(dm1)
 
-    print("E(SCF):       ", mf.e_tot)
-    print("E(cor):       ", mycc.e_corr)
-    print("E(T):         ", et)
-    print("Total energy: ", mycc.e_corr + mf.e_tot + et)
+        # Do PySCF CCSD(T)
+        mycc = cc.CCSD(mf)
+        mycc.max_cycle = 500
+        mycc.conv_tol = 1E-7
+        mycc.conv_tol_normt = 1E-5
+        mycc.diis_space = 24
+        mycc.diis_start_cycle = 4
+        mycc.kernel()
+        et = mycc.ccsd_t()
 
-    n_elec = mol.nelectron
-    n_orb = mf.mo_coeff[0].shape[-1]
+        pyscf_escf = mf.e_tot
+        pyscf_ecor = mycc.e_corr + et
+        pyscf_etot = pyscf_escf + pyscf_ecor
+        pyscf_results = np.array([pyscf_escf, pyscf_ecor, pyscf_etot])
 
-    # Now repeat, but freeze two core electrons
-    frozen = 2
-    n_elec -= frozen
-    n_orb -= frozen//2
-    h1, eri, ecore, num_alpha, num_beta = gen_cas(mf, n_orb, n_elec)
+        n_elec = mol.nelectron
+        n_orb = mf.mo_coeff[0].shape[-1]
 
-    ccsd_t(h1, eri, ecore, num_alpha, num_beta)
+        chemftr_results = ccsd_t(*gen_cas(mf, n_orb, n_elec))
+        chemftr_results = np.asarray(chemftr_results)
 
-    print('\nDoing: ROHF')
-    mol = gto.Mole()
-    mol.verbose = 0
-    mol.atom = 'H 0 0 0; F 0 0 1.1'
-    mol.charge = 0
-    mol.spin = 2
-    mol.basis = 'ccpvtz'
-    mol.symmetry = False
-    mol.build()
+        # ignore relative tolerance, we just want absolute tolerance
+        print("Pyscf:", pyscf_etot, " Chemftr: ", chemftr_results[-1])
+        assert np.allclose(pyscf_results,chemftr_results,rtol=1E-14)
 
-    mf = scf.ROHF(mol)
-    mf.init_guess = 'mindo'
-    mf.conv_tol = 1e-10
-    mf.kernel()
-    mo1 = mf.stability()[0]
-    dm1 = mf.make_rdm1(mo1, mf.mo_occ)
-    mf = mf.run(dm1)
 
-    mycc = cc.CCSD(mf)
-    mycc.max_cycle = 300
-    mycc.kernel()
-    et = mycc.ccsd_t()
+    print("\nReduced CCSD(T) vs PySCF CAS(No,2e) ")
+    for scf_type in ['rhf','rohf']:
+        mol = gto.Mole()
+        mol.atom = 'H 0 0 0; F 0 0 1.1'
+        mol.charge = 0
+        if scf_type == 'rhf':
+            mol.spin = 0
+        elif scf_type == 'rohf':
+            mol.spin = 2
+        mol.basis = 'ccpvtz'
+        mol.symmetry = False
+        mol.build()
 
-    print("E(SCF):       ", mf.e_tot)
-    print("E(cor):       ", mycc.e_corr)
-    print("E(T):         ", et)
-    print("Total energy: ", mycc.e_corr + mf.e_tot + et)
+        if scf_type == 'rhf':
+            mf = scf.RHF(mol)
+        elif scf_type == 'rohf':
+            mf = scf.ROHF(mol) 
 
-    n_elec = mol.nelectron
-    n_orb = mf.mo_coeff[0].shape[-1]
+        mf.init_guess = 'mindo'
+        mf.conv_tol = 1e-10
+        mf.kernel()
+        mo1 = mf.stability()[0]
+        dm1 = mf.make_rdm1(mo1, mf.mo_occ)
+        mf = mf.run(dm1)
 
-    # Now repeat, but freeze two core electrons
-    frozen = 2
-    n_elec -= frozen
-    n_orb -= frozen//2
-    h1, eri, ecore, num_alpha, num_beta = gen_cas(mf, n_orb, n_elec)
+        # Do PySCF CAS(No,2e) -- for 2 electrons CCSD (and so CCSD(T)) is exact
+        n_elec = 2 # electrons
+        n_orb = mf.mo_coeff[0].shape[-1] - mf.mol.nelectron - n_elec
+        mycas = mf.CASCI(n_orb, n_elec).run()
 
-    ccsd_t(h1, eri, ecore, num_alpha, num_beta)
+        pyscf_etot = mycas.e_tot
+
+        # Don't do triples (it's zero anyway for 2e) b/c div by zero error for ROHF references
+        _, _, chemftr_etot = ccsd_t(*gen_cas(mf, n_orb, n_elec),no_triples=True)
+
+        # ignore relative tolerance, we just want absolute tolerance
+        print("Pyscf:", pyscf_etot, " Chemftr: ", chemftr_etot)
+        assert np.isclose(pyscf_etot,chemftr_etot,rtol=1E-14)
