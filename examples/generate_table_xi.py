@@ -35,13 +35,15 @@ class NullIO(StringIO):
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
+USE_KERNEL = False # do re-run SCF prior to CCSD_T?
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
+#REIHER_INTS = '../src/chemftr/integrals/eri_reiher_newscf.h5'  # path to integrals
 
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
 sys.stdout = NullIO()
 escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=REIHER_INTS,\
-                                     num_alpha=27,num_beta=27)
+                                     num_alpha=27,num_beta=27,use_kernel=USE_KERNEL)
 sys.stdout = sys.__stdout__
 
 exact_ecor = ecor
@@ -56,7 +58,7 @@ for rank in range(50,401,25):
     sys.stdout = NullIO()
     n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=REIHER_INTS)
     escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=REIHER_INTS,
-                                         num_alpha=27,num_beta=27)
+                                         num_alpha=27,num_beta=27,  use_kernel=USE_KERNEL)
     error = (ecor - exact_ecor)*1E3  # to mEh
     sys.stdout = sys.__stdout__
     print("{:^12} {:^12.1f} {:^24.2f}".format(rank,lam,error))

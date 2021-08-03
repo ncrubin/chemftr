@@ -4,9 +4,9 @@ import numpy as np
 from chemftr.rank_reduce import double_factorize
 from chemftr.util import read_cas, ccsd_t
 
-
+# FIXME: remove use_kernel when finished debugging
 def compute_ccsd_t(thresh: float, integral_path: str, num_alpha = None, num_beta = None, \
-    reduction: str = 'eigendecomp', verify_eri: bool = False) -> Tuple[int, float]:
+    reduction: str = 'eigendecomp', verify_eri: bool = False, use_kernel = False) -> Tuple[int, float]:
     """ Compute CCSD(T) energy for Hamiltonian using DF method of von Burg, et al.
 
     Args:
@@ -22,7 +22,7 @@ def compute_ccsd_t(thresh: float, integral_path: str, num_alpha = None, num_beta
     """
     h1, eri_full, ecore, num_alpha, num_beta = read_cas(integral_path, num_alpha, num_beta)
     eri_rr, _, _, _ = double_factorize(eri_full, thresh, reduction, verify_eri)
-    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full)
+    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full, use_kernel)
 
     return e_scf, e_cor, e_tot
 

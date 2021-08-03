@@ -35,13 +35,15 @@ class NullIO(StringIO):
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
+USE_KERNEL = False  # Re-do SCF prior to CCSD(T)? 
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
+#REIHER_INTS = '../src/chemftr/integrals/eri_reiher_newscf.h5'  # path to integrals
 
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
 sys.stdout = NullIO()
 escf, ecor, etot = df.compute_ccsd_t(thresh=0.0,integral_path=REIHER_INTS,\
-                                     num_alpha=27,num_beta=27)
+                                     num_alpha=27,num_beta=27, use_kernel=USE_KERNEL)
 sys.stdout = sys.__stdout__
 
 exact_ecor = ecor
@@ -58,7 +60,7 @@ for thresh in [0.1, 0.05, 0.025, 0.0125, 0.01, 0.0075, 0.005, 0.0025, 0.00125, 0
     sys.stdout = NullIO()
     n_orb, lam, L, Lxi = df.compute_lambda(thresh, integral_path=REIHER_INTS)
     escf, ecor, etot = df.compute_ccsd_t(thresh, integral_path=REIHER_INTS,
-                                         num_alpha=27,num_beta=27)
+                                         num_alpha=27,num_beta=27, use_kernel=USE_KERNEL)
     error = (ecor - exact_ecor)*1E3  # to mEh
     sys.stdout = sys.__stdout__
     print("{:^12.6f} {:^12} {:^12} {:^12.1f} {:^24.2f}".format(thresh,L,Lxi,lam,error))

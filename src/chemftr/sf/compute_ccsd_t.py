@@ -5,8 +5,9 @@ from chemftr.rank_reduce import single_factorize
 from chemftr.util import read_cas, ccsd_t
 
 
+# FIXME; Remove use_kernel when finished debugging
 def compute_ccsd_t(cholesky_dim: int, integral_path: str, num_alpha = None, num_beta = None, \
-    reduction: str = 'eigendecomp', verify_eri: bool = False) -> Tuple[int, float]:
+    reduction: str = 'eigendecomp', verify_eri: bool = False, use_kernel = False) -> Tuple[int, float]:
     """ Compute CCSD(T) energy for Hamiltonian using SF method of Berry, et al.
 
     Args:
@@ -25,7 +26,7 @@ def compute_ccsd_t(cholesky_dim: int, integral_path: str, num_alpha = None, num_
     # compute the rank-reduced eri tensors (LR.LR^T = eri_rr ~= eri_full)
     eri_rr, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
 
-    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full)
+    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full, use_kernel)
 
     return e_scf, e_cor, e_tot
 

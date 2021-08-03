@@ -1,6 +1,7 @@
 """ Utilities for FT costing calculations """
 from typing import Tuple, Optional
 import sys
+import os
 import h5py
 import numpy as np
 from pyscf import gto, scf, mcscf, ao2mo, cc
@@ -232,7 +233,8 @@ def save_cas(fname, h1, eri, ecore, num_alpha, num_beta):
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
-def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
+# FIXME: Remove the use_kernel option after done debugging
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=False) \
     -> Tuple[float, float, float]:
     """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
 
@@ -253,7 +255,9 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
 
     mol = gto.M()
     mol.nelectron = num_alpha + num_beta
-    mol.incore_anyway = True
+    n_orb = h1.shape[0]
+    alpha_diag = [1] * num_alpha + [0] * (n_orb - num_alpha)
+    beta_diag  = [1] * num_beta  + [0] * (n_orb - num_beta)
 
     # If eri_full not provided, use (possibly rank-reduced) ERIs for SCF and SCF energy check
     if eri_full is None:
@@ -290,34 +294,52 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
     mf.energy_nuc = lambda *args: ecore
     mf._eri = eri_full # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
 
-    mf.conv_tol = 1e-10
     mf.init_guess = '1e'
-    mf.kernel()
-    mol = mf.stability()[0]
-    dm = mf.make_rdm1(mol, mf.mo_occ)
-    mf = mf.run(dm)
-    mol = mf.stability()[0]
-    dm = mf.make_rdm1(mol, mf.mo_occ)
-    mf = mf.run(dm)
+    mf.mo_coeff = np.eye(n_orb)
+    mf.mo_occ = np.array(alpha_diag) + np.array(beta_diag)
+    w, v = np.linalg.eigh(mf.get_fock())
+    mf.mo_energy = w
 
-    # Now replace with possibly rank-reduced ERIs for the coupled cluster calculation
-    mf._eri = eri
+    # This option should not be used other than for debugging, as it will rotate the interaction
+    # tensors into a new basis. However, sometimes it is useful to see if the "converged SCF" that 
+    # is read in is really converged or not ...
+    if use_kernel: 
+        mf.conv_tol = 1e-10
+        mf.init_guess = '1e'
+        mf.max_cycle = 300 
+        mf.kernel()
+        mol = mf.stability()[0]
+        dm = mf.make_rdm1(mol, mf.mo_occ)
+        mf = mf.run(dm)
+        mol = mf.stability()[0]
+        dm = mf.make_rdm1(mol, mf.mo_occ)
+        mf = mf.run(dm)
+        #save_cas('eri_reiher_newscf.h5',*gen_cas(mf,h1.shape[0],num_alpha + num_beta))
+        mf._eri = eri # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
 
-    # Check SCF has not changed by doing restart!
-    #print(scf_energy, mf.e_tot)
-    try:
-        assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
-    except AssertionError:
-        print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
-        print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
+        # Check SCF has not changed by doing restart!
+        print(scf_energy, mf.e_tot)
+        try:
+            assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
+        except AssertionError:
+            print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
+            print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
+
+    # Now set the eri's to the (possibly rank-reduced) ERIs
+    mf._eri = eri # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
+    mf.mol.incore_anyway = True
 
     mycc = cc.CCSD(mf)
-    mycc.max_cycle = 300
+    mycc.max_cycle = 500
+    mycc.conv_tol = 1E-7
+    mycc.conv_tol_normt = 1E-5
+    mycc.diis_space = 24
+    mycc.diis_start_cycle = 4
     mycc.verbose = 4
     mycc.kernel()
     et = mycc.ccsd_t()
 
-    e_scf = mf.e_tot
+    e_scf = scf_energy 
     e_cor = mycc.e_corr + et
     e_tot = e_scf + e_cor
 
@@ -326,6 +348,31 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None) \
     print("E(cor):       ", e_cor)
     print("Total energy: ", e_tot)
     return e_scf, e_cor, e_tot
+
+class RunSilent(object):
+    """ Context manager to prevent function from writing anything to stdout/stderr 
+        e.g. for noisy_function(), wrap it like so
+
+        with RunSilent():
+            noisy_function()
+
+        ... and your terminal will no longer be littered with prints
+    """
+    def __init__(self,stdout = None, stderr = None):
+        self.devnull = open(os.devnull,'w')
+        self._stdout = stdout or self.devnull or sys.stdout
+        self._stderr = stderr or self.devnull or sys.stderr
+
+    def __enter__(self):
+        self.old_stdout, self.old_stderr = sys.stdout, sys.stderr
+        self.old_stdout.flush(); self.old_stderr.flush()
+        sys.stdout, sys.stderr = self._stdout, self._stderr
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._stdout.flush(); self._stderr.flush()
+        sys.stdout = self.old_stdout
+        sys.stderr = self.old_stderr
+        self.devnull.close()
 
 
 if __name__ == '__main__':
