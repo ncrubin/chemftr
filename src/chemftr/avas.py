@@ -30,6 +30,7 @@ class AVAS(object):
         self.mol = gto.M(atom = self.geometry,
                 basis = self.basis,
                 spin = self.spin, # goes by 2 * S not 2S+1
+                charge = self.charge,
                 symmetry = self.symmetry,
                 unit = self.unit)
 
@@ -142,8 +143,8 @@ class AVAS(object):
             self.mf.mo_energy = scf_dict['mo_energy']
             print("Original number of orbitals ", self.mf.mo_coeff.shape[0])
 
-            d0 = self.mf.make_rdm1()
-            self.mf.kernel(d0)
+            #d0 = self.mf.make_rdm1()
+            #self.mf.kernel(d0)
 
         print("({}, {}) high spin config (alpha, beta)".format(self.mf.nelec[0], self.mf.nelec[1]))
 
@@ -151,6 +152,7 @@ class AVAS(object):
         #print(ao_labels)
         # Note: requires openshell_option = 3 for this to work
         avas_output = avas.avas(self.mf, ao_list, canonicalize=False, openshell_option=3)
+        print(avas_output)
         self.active_norb, self.active_ne, self.reordered_orbs = avas_output
         print("Active Orb:      ", self.active_norb)
         print("Active Ele:      ", self.active_ne)
@@ -160,6 +162,13 @@ class AVAS(object):
         h1_avas, eri_avas, ecore, active_alpha, active_beta = gen_cas(self.mf, self.active_norb,
             self.active_ne, avas_orbs=self.reordered_orbs)
         print(active_alpha, active_beta)
+
+        # save set of localized orbitals for active space
+        frozen_alpha = self.mf.nelec[0] - active_alpha
+
+        active_space_idx = slice(frozen_alpha,frozen_alpha+self.active_norb)
+        active_mos = self.reordered_orbs[:,active_space_idx]
+        tools.molden.from_mo(self.mf.mol, 'avas_localized_orbitals_'+self.name+'.molden', mo_coeff=active_mos)
 
         # verify using OpenFermion
         self.verify_using_openfermion(self.mf, h1_avas, eri_avas, ecore, active_alpha, active_beta)
