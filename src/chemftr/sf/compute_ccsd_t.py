@@ -5,9 +5,8 @@ from chemftr.rank_reduce import single_factorize
 from chemftr.util import read_cas, ccsd_t
 
 
-# FIXME; Remove use_kernel when finished debugging
 def compute_ccsd_t(cholesky_dim: int, integral_path: str, num_alpha = None, num_beta = None, \
-    reduction: str = 'eigendecomp', verify_eri: bool = False, use_kernel = False) -> Tuple[int, float]:
+    reduction: str = 'eigendecomp', verify_eri: bool = False, use_kernel = True) -> Tuple[int, float]:
     """ Compute CCSD(T) energy for Hamiltonian using SF method of Berry, et al.
 
     Args:

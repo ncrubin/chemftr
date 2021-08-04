@@ -237,8 +237,7 @@ def save_cas(fname, h1, eri, ecore, num_alpha, num_beta):
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
-# FIXME: Remove the use_kernel option after done debugging
-def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=False, \
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=True, \
     no_triples=False) -> Tuple[float, float, float]:
     """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
 
