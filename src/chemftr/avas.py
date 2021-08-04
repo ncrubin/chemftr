@@ -12,7 +12,7 @@ from openfermion.chem.molecular_data import spinorb_from_spatial
 
 class AVAS(object):
 
-    def __init__(self,geometry,charge,multiplicity,basis='sto-3g',scf_type='rohf',symmetry='C1',name='pyscf',unit='angstrom'):
+    def __init__(self,geometry,charge,multiplicity,basis='sto-3g',scf_type='rohf',symmetry='C1',name='pyscf',unit='angstrom',loc_type='pm'):
         if geometry.split('.')[-1].lower() == 'xyz':
             self.geometry = read_xyz(geometry)
         else:
@@ -36,6 +36,7 @@ class AVAS(object):
                 symmetry = self.symmetry,
                 unit = self.unit)
 
+        self.loc_type = loc_type
         self.scf_done = False
         self.localization_done = False
 
@@ -65,7 +66,9 @@ class AVAS(object):
         self.scf_done = True
 
 
-    def localize(self,loc_type='pm',verbose=0,save=True):
+    def localize(self,loc_type='pm',checkfile=None,verbose=0,save=True):
+
+        self.loc_type = loc_type
 
         if self.scf_done:
             print("Localization: using data from SCF in memory.")
@@ -76,9 +79,17 @@ class AVAS(object):
                         'mo_coeff' : self.mf.mo_coeff}
 
         else:
-            chkfile_path = self.name + '.chk'
+            if checkfile is None:
+                chkfile_path = self.name + '.chk'
+            else: 
+                chkfile_path = checkfile 
             print("Localization: using data from %s" % chkfile_path)
-            mol, scf_dict = scf.chkfile.load_scf(chkfile_path)
+            try:
+                mol, scf_dict = scf.chkfile.load_scf(chkfile_path)
+            except FileNotFoundError:
+                sys.exit("Inside "+sys._getframe().f_code.co_name+" \
+                         \nCheckfile '"+str(chkfile_path)+"' not found. Did you generate it?\
+                         \n Hint: you can pass checkpoint with the 'checkfile' keyword.")
 
         docc_idx = np.where(np.isclose(scf_dict['mo_occ'], 2.))[0]
         socc_idx = np.where(np.isclose(scf_dict['mo_occ'], 1.))[0]
@@ -114,17 +125,17 @@ class AVAS(object):
 
         if save:
             loc_mo_coeff = np.hstack((loc_docc_mo, loc_socc_mo, loc_virt_mo))
-            np.save(self.name+"_{}_localized_mocoeffs".format(loc_type), loc_mo_coeff)
+            np.save(self.name+"_{}_localized_mocoeffs".format(self.loc_type), loc_mo_coeff)
 
 
-            localized_chkfile_name = self.name +'_{}_localized.chk'.format(loc_type)
+            localized_chkfile_name = self.name +'_{}_localized.chk'.format(self.loc_type)
             scf.chkfile.dump_scf(mol, localized_chkfile_name, scf_dict['e_tot'], scf_dict['mo_energy'], loc_mo_coeff, scf_dict['mo_occ'])
 
-            molden_filename = self.name+'_{}_localized.molden'.format(loc_type)
+            molden_filename = self.name+'_{}_localized.molden'.format(self.loc_type)
             tools.molden.from_chkfile(molden_filename, localized_chkfile_name)
 
 
-    def do_avas(self,ao_list=['C 2pz','N 2pz', 'S 3s', 'S 3p', 'S 3s', 'Fe 3d']):
+    def do_avas(self,ao_list,checkfile=None):
 
         if self.scf_done:
             print("AVAS: using data from SCF in memory.")
@@ -134,9 +145,18 @@ class AVAS(object):
                         'mo_coeff' : self.mf.mo_coeff}
             print("Original number of orbitals ", self.mf.mo_coeff.shape[0])
         else:
-            chkfile_path = self.name + '.chk'
+
+            if checkfile is None:
+                chkfile_path = self.name +'_{}_localized.chk'.format(self.loc_type) 
+            else: 
+                chkfile_path = checkfile 
             print("AVAS: using data from %s" % chkfile_path)
-            self.mol, scf_dict = scf.chkfile.load_scf(chkfile_path)
+            try:
+                self.mol, scf_dict = scf.chkfile.load_scf(chkfile_path)
+            except FileNotFoundError:
+                sys.exit("Inside "+sys._getframe().f_code.co_name+" \
+                         \nCheckfile '"+str(chkfile_path)+"' not found. Did you generate it?\
+                         \n Hint: you can pass checkpoint with the 'checkfile' keyword.")
 
             self.mf = scf.ROHF(self.mol)
             self.mf.e_tot = scf_dict['e_tot']
@@ -174,20 +194,31 @@ class AVAS(object):
         h5name = "avas_hamiltonian_"+self.name+".h5"
         self.save_cas(h5name, h1_avas, eri_avas, ecore, active_alpha, active_beta)
 
-    def do_single_factorization(self,rank_range=range(50,401,25)):
+    def do_single_factorization(self,rank_range=range(50,401,25),chi=10,dE=0.001,use_kernel=True,\
+        integral_path=None):
                                                                                                          
-        DE = 0.001  # max allowable phase error                                                              
-        CHI = 10    # number of bits for representation of coefficients                                      
-        USE_KERNEL = True # do re-run SCF prior to CCSD_T?                                                  
-        INTS = 'avas_hamiltonian_'+self.name+'.h5' 
+        DE = dE  # max allowable phase error                                                              
+        CHI = chi    # number of bits for representation of coefficients                                      
+        USE_KERNEL = use_kernel # do re-run SCF prior to CCSD_T?                                                  
+      
+        if integral_path is None:
+            INTS = 'avas_hamiltonian_'+self.name+'.h5' 
+        else:
+            INTS = integral_path
     
+        try:
         # Get active space info
-        with h5py.File(INTS, "r") as f:
-            num_alpha = int(f['active_nalpha'][()]) 
-            num_beta  = int(f['active_nbeta'][()]) 
-            num_orb   = np.asarray(f['h0'][()]).shape[0]
+            with h5py.File(INTS, "r") as f:
+                num_alpha = int(f['active_nalpha'][()]) 
+                num_beta  = int(f['active_nbeta'][()]) 
+                num_orb   = np.asarray(f['h0'][()]).shape[0]
+        except FileNotFoundError:
+            sys.exit("Inside "+sys._getframe().f_code.co_name+" \
+                     \nAVAS Hamiltonian '"+str(INTS)+"' not found. Did you generate it?\
+                     \n Hint: you can pass Hamiltonian with the 'integral_path' keyword.")
         
         cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
+
         # Reference calculation (dim = None is full cholesky / exact ERIs)                                   
         # run silently                                                                                       
         with RunSilent():
@@ -221,19 +252,31 @@ class AVAS(object):
         with open(filename,'a') as f:
             print("{}".format('='*89),file=f)                                                                                  
 
-    def do_double_factorization(self,thresh_range):
+    def do_double_factorization(self,thresh_range,dE=0.001,chi=10,beta=20,use_kernel=True,
+        integral_path=None):
                                                                                                          
-        DE = 0.001  # max allowable phase error                                                              
-        CHI = 10    # number of bits for representation of coefficients                                      
-        BETA = 20   # not sure what we want here, but 20 was good enough for Li Hamiltonian
-        USE_KERNEL = True # do re-run SCF prior to CCSD_T?                                                  
-        INTS = 'avas_hamiltonian_'+self.name+'.h5' 
-    
-        # Get active space info
-        with h5py.File(INTS, "r") as f:
-            num_alpha = int(f['active_nalpha'][()]) 
-            num_beta  = int(f['active_nbeta'][()]) 
-            num_orb   = np.asarray(f['h0'][()]).shape[0]
+        DE = dE  # max allowable phase error                                                              
+        CHI = chi    # number of bits for representation of coefficients                                      
+        BETA = beta   # not sure what we want here, but 20 was good enough for Li Hamiltonian
+        USE_KERNEL = use_kernel # do re-run SCF prior to CCSD_T?                                                  
+
+        if integral_path is None:
+            INTS = 'avas_hamiltonian_'+self.name+'.h5' 
+        else:
+            INTS = integral_path
+   
+        try: 
+            # Get active space info
+            with h5py.File(INTS, "r") as f:
+                num_alpha = int(f['active_nalpha'][()]) 
+                num_beta  = int(f['active_nbeta'][()]) 
+                num_orb   = np.asarray(f['h0'][()]).shape[0]
+        except FileNotFoundError:
+            sys.exit("Inside "+sys._getframe().f_code.co_name+" \
+                     \nAVAS Hamiltonian '"+str(INTS)+"' not found. Did you generate it?\
+                     \n Hint: you can pass Hamiltonian with the 'integral_path' keyword.")
+
+   
         
         cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
                                                                                                              

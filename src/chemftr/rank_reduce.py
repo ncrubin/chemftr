@@ -1,4 +1,5 @@
 """ Utilities for rank reduction of ERIs """
+import sys
 import time
 import numpy as np
 
@@ -40,7 +41,10 @@ def single_factorize(eri_full, cholesky_dim, reduction='eigendecomp',verify_eri=
     eri_rr = eri_rr.reshape(n_orb, n_orb, n_orb, n_orb)
     LR = LR.reshape(n_orb, n_orb, -1)
     if cholesky_dim is not None:
-        assert LR.shape[2] == cholesky_dim
+        try:
+            assert LR.shape[2] == cholesky_dim
+        except AssertionError:
+            sys.exit("LR.shape:     %s\ncholesky_dim: %s\nLR.shape and cholesky_dim are inconsistent" % (LR.shape, cholesky_dim))
     #print("ERI delta = ", np.linalg.norm(eri_rr - eri_full))
 
     return eri_rr, LR

@@ -19,7 +19,11 @@ def QR(L : int, M1 : int) -> Tuple[int, int]:
        val_opt (int) - minimal (optimal) cost of QROM
     """
     k = 0.5 * np.log2(L/M1)
-    assert k >= 0
+    try:
+        assert k >= 0
+    except AssertionError:
+        sys.exit("In function QR: \
+        \n  L is smaller than M: increase RANK or lower THRESH (or alternatively decrease CHI)")
     value = lambda k: L/np.power(2,k) + M1*(np.power(2,k) - 1)
     k_int = [np.floor(k),np.ceil(k)]  # restrict optimal k to integers
     k_opt = k_int[np.argmin(value(k_int))]  # obtain optimal k

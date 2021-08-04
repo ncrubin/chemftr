@@ -35,9 +35,8 @@ class NullIO(StringIO):
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
-USE_KERNEL = False  # Re-do SCF prior to CCSD(T)? 
+USE_KERNEL = True  # Re-do SCF prior to CCSD(T)? 
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
-#REIHER_INTS = '../src/chemftr/integrals/eri_reiher_newscf.h5'  # path to integrals
 
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
