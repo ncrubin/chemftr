@@ -1,9 +1,11 @@
 """ AVAS pipeline """
+import sys
 import numpy as np
 from pyscf import gto, scf, lo, tools, mcscf, ao2mo, cc
 from pyscf.mcscf import avas
 import h5py
-from chemftr.util import gen_cas
+from chemftr.util import gen_cas, RunSilent
+from chemftr import sf, df
 import openfermion as of
 from openfermion.chem.molecular_data import spinorb_from_spatial
 
@@ -50,7 +52,7 @@ class AVAS(object):
         self.mf.damp = 0.2
         self.mf.chkfile = self.name+'.chk'
         self.mf.init_guess = 'chkfile'
-        self.mf.conv_tol = 1e-10
+        self.mf.conv_tol = 1e-8
         self.mf.kernel()
 
         if stable:
@@ -176,6 +178,101 @@ class AVAS(object):
         h5name = "avas_hamiltonian_"+self.name+".h5"
         self.save_cas(h5name, h1_avas, eri_avas, ecore, active_alpha, active_beta)
 
+    def do_single_factorization(self,rank_range=range(50,401,25)):
+                                                                                                         
+        DE = 0.001  # max allowable phase error                                                              
+        CHI = 10    # number of bits for representation of coefficients                                      
+        USE_KERNEL = True # do re-run SCF prior to CCSD_T?                                                  
+        INTS = 'avas_hamiltonian_'+self.name+'.h5' 
+    
+        # Get active space info
+        with h5py.File(INTS, "r") as f:
+            num_alpha = int(f['active_nalpha'][()]) 
+            num_beta  = int(f['active_nbeta'][()]) 
+            num_orb   = np.asarray(f['h0'][()]).shape[0]
+        
+        cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
+        # Reference calculation (dim = None is full cholesky / exact ERIs)                                   
+        # run silently                                                                                       
+        with RunSilent():
+            escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=INTS,use_kernel=USE_KERNEL)                 
+                                                                                                             
+        exact_ecor = ecor                                                                                    
+    
+        filename = 'single_factorization_'+self.name+'.txt'
+    
+        with open(filename,'w') as f:
+            print("\n Single low rank factorization data for '"+self.name+"'.",file=f)                                          
+            print("    --- using "+cas_info,file=f)                                          
+            print("{}".format('='*89),file=f)                                                                           
+            print("{:^12} {:^12} {:^24} {:^20} {:^20}".format('L','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+            print("{}".format('-'*89),file=f)                                                                           
+        for rank in rank_range:                                                                        
+            # run silently                                                                                   
+            with RunSilent():
+    
+                # First, up: lambda and CCSD(T)
+                n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=INTS)                     
+                escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=INTS, use_kernel=USE_KERNEL)           
+                error = (ecor - exact_ecor)*1E3  # to mEh                                                        
+          
+                # now do costing
+                stps1 = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI, stps=20000)[0]
+                sf_cost, sf_total_cost, sf_logical_qubits = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI,
+                                                                        stps=stps1)
+            with open(filename,'a') as f:
+                print("{:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(rank,lam,error, sf_logical_qubits, sf_total_cost),file=f)                                       
+        with open(filename,'a') as f:
+            print("{}".format('='*89),file=f)                                                                                  
+
+    def do_double_factorization(self,thresh_range):
+                                                                                                         
+        DE = 0.001  # max allowable phase error                                                              
+        CHI = 10    # number of bits for representation of coefficients                                      
+        BETA = 20   # not sure what we want here, but 20 was good enough for Li Hamiltonian
+        USE_KERNEL = True # do re-run SCF prior to CCSD_T?                                                  
+        INTS = 'avas_hamiltonian_'+self.name+'.h5' 
+    
+        # Get active space info
+        with h5py.File(INTS, "r") as f:
+            num_alpha = int(f['active_nalpha'][()]) 
+            num_beta  = int(f['active_nbeta'][()]) 
+            num_orb   = np.asarray(f['h0'][()]).shape[0]
+        
+        cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
+                                                                                                             
+        # Reference calculation (dim = None is full cholesky / exact ERIs)                                   
+        # run silently                                                                                       
+        with RunSilent():
+            escf, ecor, etot = df.compute_ccsd_t(thresh=0.0,integral_path=INTS,use_kernel=USE_KERNEL)                 
+                                                                                                             
+        exact_ecor = ecor                                                                                    
+    
+        filename = 'double_factorization_'+self.name+'.txt'
+    
+        with open(filename,'w') as f:
+            print("\n Double low rank factorization data for '"+self.name+"'.",file=f)                                          
+            print("    --- using "+cas_info,file=f)                                          
+            print("{}".format('='*120),file=f)                                                                           
+            print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+            print("{}".format('-'*120),file=f)                                                                           
+        for thresh in thresh_range:                                                                        
+            # run silently                                                                                   
+            with RunSilent(): 
+                # First, up: lambda and CCSD(T)
+                n_orb, lam, L, Lxi = df.compute_lambda(thresh, integral_path=INTS)                     
+                escf, ecor, etot = df.compute_ccsd_t(thresh, integral_path=INTS, use_kernel=USE_KERNEL)           
+                error = (ecor - exact_ecor)*1E3  # to mEh                                                        
+          
+                # now do costing
+                stps1 = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=20000)[0]
+                df_cost, df_total_cost, df_logical_qubits = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=stps1)
+    
+            with open(filename,'a') as f:
+                print("{:^12.6f} {:^12} {:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(thresh,L,Lxi,lam,error, df_logical_qubits, df_total_cost),file=f)                                       
+        with open(filename,'a') as f:
+            print("{}".format('='*120),file=f)                                                                                  
+
     @staticmethod
     def save_cas(fname,h1,eri,ecore,num_alpha,num_beta):
         with h5py.File(fname, 'w') as fid:
@@ -229,8 +326,13 @@ def read_xyz(filename):
 
 if __name__ == '__main__':
 
-    chem = AVAS('aligned_xy.xyz',charge=3,multiplicity=6,basis='sto3g')
+    chem = AVAS('aligned_xy.xyz',charge=0,multiplicity=6,basis='sto3g')
     chem.do_scf()
     chem.localize(loc_type='pm')
     chem.do_avas()
 
+    # make pretty SF costing table
+    chem.do_single_factorization()
+
+    # make pretty DF costing table
+    chem.do_double_factorization()
