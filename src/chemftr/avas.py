@@ -145,16 +145,12 @@ class AVAS(object):
             self.mf.mo_energy = scf_dict['mo_energy']
             print("Original number of orbitals ", self.mf.mo_coeff.shape[0])
 
-            #d0 = self.mf.make_rdm1()
-            #self.mf.kernel(d0)
-
         print("({}, {}) high spin config (alpha, beta)".format(self.mf.nelec[0], self.mf.nelec[1]))
 
         ao_labels = self.mol.ao_labels()
         #print(ao_labels)
         # Note: requires openshell_option = 3 for this to work
         avas_output = avas.avas(self.mf, ao_list, canonicalize=False, openshell_option=3)
-        print(avas_output)
         self.active_norb, self.active_ne, self.reordered_orbs = avas_output
         print("Active Orb:      ", self.active_norb)
         print("Active Ele:      ", self.active_ne)
