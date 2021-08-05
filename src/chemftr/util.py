@@ -31,7 +31,6 @@ def QR(L : int, M1 : int) -> Tuple[int, int]:
 def QR2(L1: int, L2: int, M1: int) -> Tuple[int, int, int]:
     """ This gives the optimal k values and minimum cost for a QROM using two L values of size M,
         e.g. the optimal k values for the QROM on two registers.
-
     Args:
         L1 (int) -
         L2 (int) -
