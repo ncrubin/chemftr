@@ -135,7 +135,7 @@ class AVAS(object):
             tools.molden.from_chkfile(molden_filename, localized_chkfile_name)
 
 
-    def do_avas(self,ao_list,checkfile=None):
+    def do_avas(self,ao_list,checkfile=None,**kwargs):
 
         if self.scf_done:
             print("AVAS: using data from SCF in memory.")
@@ -170,7 +170,7 @@ class AVAS(object):
         ao_labels = self.mol.ao_labels()
         #print(ao_labels)
         # Note: requires openshell_option = 3 for this to work
-        avas_output = avas.avas(self.mf, ao_list, canonicalize=False, openshell_option=3)
+        avas_output = avas.avas(self.mf, ao_list, canonicalize=False, openshell_option=3,**kwargs)
         self.active_norb, self.active_ne, self.reordered_orbs = avas_output
         print("Active Orb:      ", self.active_norb)
         print("Active Ele:      ", self.active_ne)

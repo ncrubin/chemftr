@@ -4,11 +4,13 @@ from chemftr.avas import AVAS
 # to comment out routines already run. If a function doesn't have enough information, it won't work!
 
 # This is a very small example, so kind of finicky with thresholds and rank-reductions
-chem = AVAS('Fe 0.0 0.0 0.0',charge=3,multiplicity=6,basis='ccpvtz')  # Fe(III) high-spin d5
+chem = AVAS('Fe 0.0 0.0 0.0',charge=3,multiplicity=2,basis='ccpvdz')  # Fe(III) low-spin 
 chem.do_scf()
 chem.localize(loc_type='pm')
 #print(chem.mf.mol.ao_labels())  # see labels of the AO basis to choose from
-chem.do_avas(ao_list=['Fe 3s', 'Fe 3p', 'Fe 3d', 'Fe 4s'])
+
+# use larger basis for minao to select non-valence...here select 4d as well for double-shell effect
+chem.do_avas(ao_list=['Fe 3d', 'Fe 4d'],minao='ccpvdz') 
 
 # make pretty SF costing table
 chem.do_single_factorization(rank_range=[20,25,30,35,40,45,50])
