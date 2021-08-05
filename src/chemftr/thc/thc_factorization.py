@@ -157,7 +157,7 @@ def thc_objective_and_grad(xcur, norb, nthc, eri, verbose=False):
     etaPp = xcur[:norb*nthc].reshape(nthc,norb)  # leaf tensor  nthc x norb
     MPQ = xcur[norb*nthc:norb*nthc+nthc*nthc].reshape(nthc,nthc) # central tensor
     CprP = numpy.einsum("Pp,Pr->prP", etaPp, etaPp)  # this is einsum('mp,mq->pqm', etaPp, etaPp)
-    path = numpy.einsum_path('pqU,UV,rsV->pqrs', CprP, MPQ, CprP, optimize='optimal')
+    # path = numpy.einsum_path('pqU,UV,rsV->pqrs', CprP, MPQ, CprP, optimize='optimal')
     Iapprox = numpy.einsum('pqU,UV,rsV->pqrs', CprP, MPQ, CprP, optimize=['einsum_path', (0, 1), (0, 1)])
     deri = eri - Iapprox
     res = 0.5 * numpy.sum((deri)**2)
@@ -188,7 +188,7 @@ class CallBackStore:
             f.close()
 
 
-def lbfgsb_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed=None):
+def lbfgsb_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed=None, maxiter=150_000):
     """
     Least-squares fit of two-electron integral tensors with  L-BFGS-B
     """
@@ -213,10 +213,10 @@ def lbfgsb_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed
     # L-BFGS-B optimization
     res = minimize(thc_objective_and_grad, x, args=(norb, nthc, eri),  jac=True,
                    method='L-BFGS-B',
-                   options={'disp': None, 'maxfun': 1_000_000, 'maxiter': 1_000_00,
+                   options={'disp': None, 'maxiter': maxiter,
                             'iprint': 0},
                    callback=callback_func)
-    print(res)
+    # print(res)
     params = res.x
     x = numpy.array(params)
     f = h5py.File(chkfile_name, "w")
