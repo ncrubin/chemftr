@@ -230,7 +230,10 @@ class AVAS(object):
     
         with open(filename,'w') as f:
             print("\n Single low rank factorization data for '"+self.name+"'.",file=f)                                          
-            print("    --- using "+cas_info,file=f)                                          
+            print("    [*] using "+cas_info,file=f)                                          
+            print("        [+]                      E(SCF): %18.8f" % escf,file=f) 
+            print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
+            print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
             print("{}".format('='*89),file=f)                                                                           
             print("{:^12} {:^12} {:^24} {:^20} {:^20}".format('L','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
             print("{}".format('-'*89),file=f)                                                                           
@@ -290,8 +293,11 @@ class AVAS(object):
         filename = 'double_factorization_'+self.name+'.txt'
     
         with open(filename,'w') as f:
-            print("\n Double low rank factorization data for '"+self.name+"'.",file=f)                                          
-            print("    --- using "+cas_info,file=f)                                          
+            print("\n Double low rank factorization data for '"+self.name+"'.",file=f) 
+            print("    [*] using "+cas_info,file=f)                                          
+            print("        [+]                      E(SCF): %18.8f" % escf,file=f) 
+            print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
+            print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
             print("{}".format('='*120),file=f)                                                                           
             print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
             print("{}".format('-'*120),file=f)                                                                           
