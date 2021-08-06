@@ -110,7 +110,7 @@ def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
     return eri_rr, lambda_F, R, M
 
 
-def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, perform_bfgs_opt=True, bfgs_chkfile_name=None,
+def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, perform_bfgs_opt=True, bfgs_chkfile_name=None,
                 bfgs_maxiter=1500, random_start_thc=False, verify=False):
     """
     THC-CP3 performs an SVD decomposition of the eri matrix followed by a CP decomposition
@@ -162,7 +162,7 @@ def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, perform_bfgs_opt=Tru
         assert np.allclose(test_eri_mat_mulliken, eri_mat)
 
     start_time = time.time()  # timing results if requested by user
-    beta, gamma, scale = pybtas.cp3_from_cholesky(u_chol.copy(), nthc, random_start=random_start_thc)
+    beta, gamma, scale = pybtas.cp3_from_cholesky(u_chol.copy(), nthc, random_start=random_start_thc, conv_eps=conv_eps)
     cp3_calc_time = time.time() - start_time
     
     if verify:
