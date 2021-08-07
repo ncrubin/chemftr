@@ -306,9 +306,13 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     # tensors into a new basis. However, sometimes it is useful to see if the "converged SCF" that 
     # is read in is really converged or not ...
     if use_kernel: 
-        mf.conv_tol = 1e-10
+        mf.conv_tol = 1e-9
         mf.init_guess = '1e'
-        mf.max_cycle = 300 
+        mf.verbose=4
+        mf.diis_space = 24
+        mf.diis_start_cycle = 4
+        mf.level_shift = 0.25
+        mf.max_cycle = 500 
         mf.kernel()
         mol = mf.stability()[0]
         dm = mf.make_rdm1(mol, mf.mo_occ)
@@ -332,9 +336,9 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     mf.mol.incore_anyway = True
 
     mycc = cc.CCSD(mf)
-    mycc.max_cycle = 500
-    mycc.conv_tol = 1E-7
-    mycc.conv_tol_normt = 1E-5
+    mycc.max_cycle = 800
+    mycc.conv_tol = 1E-8
+    mycc.conv_tol_normt = 1E-4
     mycc.diis_space = 24
     mycc.diis_start_cycle = 4
     mycc.verbose = 4
