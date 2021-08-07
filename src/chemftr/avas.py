@@ -104,9 +104,10 @@ class AVAS(object):
             loc_virt_mo = lo.PM(mol, scf_dict['mo_coeff'][:, virt_idx]).kernel(verbose=verbose)
             print("DONE")
 
-            self.mf.mo_coeff[:,docc_idx] = loc_docc_mo.copy()
-            self.mf.mo_coeff[:,socc_idx] = loc_socc_mo.copy()
-            self.mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
+            if self.scf_done:
+                self.mf.mo_coeff[:,docc_idx] = loc_docc_mo.copy()
+                self.mf.mo_coeff[:,socc_idx] = loc_socc_mo.copy()
+                self.mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
 
         elif loc_type == 'er':
             print("Localizing doubly occupied ... ", end="")
@@ -117,9 +118,10 @@ class AVAS(object):
             loc_virt_mo = lo.ER(mol, scf_dict['mo_coeff'][:, virt_idx]).kernel(verbose=verbose)
             print("DONE")
 
-            self.mf.mo_coeff[:,docc_idx] = loc_docc_mo.copy()
-            self.mf.mo_coeff[:,socc_idx] = loc_socc_mo.copy()
-            self.mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
+            if self.scf_done:
+                self.mf.mo_coeff[:,docc_idx] = loc_docc_mo.copy()
+                self.mf.mo_coeff[:,socc_idx] = loc_socc_mo.copy()
+                self.mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
 
         self.localization_done = True
 
