@@ -185,7 +185,7 @@ def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, per
 
     if perform_bfgs_opt:
         if bfgs_chkfile_name is None:
-            chkfile = "{}_bfgs_post_cp3.chk".format(str(uuid.uuid4()[:8]))
+            chkfile = "{}_bfgs_post_cp3.chk".format(str(uuid.uuid4())[:8])
         else:
             chkfile = bfgs_chkfile_name
 
