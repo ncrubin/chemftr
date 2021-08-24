@@ -5,7 +5,7 @@ os.environ["MKL_NUM_THREADS"] = "{}".format(os.cpu_count() - 1)
 
 from chemftr.thc.adagrad import adagrad
 from chemftr.thc.thc_objectives import (thc_objective, thc_objective_grad, thc_objective_and_grad,
-                                        cp_ls_cholesky_factor_objective, )
+                                        cp_ls_cholesky_factor_objective, thc_objective_regularized)
 
 import h5py
 import numpy
@@ -15,6 +15,13 @@ import numpy.linalg
 from scipy.optimize import minimize
 
 from uuid import uuid4
+
+import jax
+import jax.numpy as jnp
+from jax.config import config
+config.update("jax_enable_x64", True)
+# from jax.experimental import optimizers
+from  jax import jit, grad
 
 
 
@@ -63,6 +70,73 @@ def lbfgsb_opt_thc(eri, nthc, chkfile_name=None, initial_guess=None, random_seed
                    callback=callback_func)
     # print(res)
     params = res.x
+    x = numpy.array(params)
+    f = h5py.File(chkfile_name, "w")
+    f["etaPp"] = x[:norb*nthc].reshape(nthc,norb)
+    f["ZPQ"] = x[norb*nthc:].reshape(nthc,nthc)
+    f.close()
+    return params
+
+
+def lbfgsb_opt_thc_l2reg(eri, nthc, chkfile_name=None, initial_guess=None, random_seed=None, maxiter=150_000,
+                          disp_freq=98, penalty_param=None, disp=False):
+    """
+    Least-squares fit of two-electron integral tensors with  L-BFGS-B with l2-regularization of lambda
+
+    disp is ignored.
+    disp_freq sets the freqnecy of printing
+    """
+    if disp_freq > 98 or disp_freq < 1:
+        raise ValueError("disp_freq {} is not valid. must be between [1, 98]".format(disp_freq))
+
+    # initialize chkfile name if one isn't set
+    if chkfile_name is None:
+        chkfile_name = str(uuid4()) + '.h5'
+
+    # callback func stores checkpoints
+    callback_func = CallBackStore(chkfile_name)
+
+    # set initial guess
+    norb = eri.shape[0]
+    if initial_guess is None:
+        if random_seed is None:
+            x = numpy.random.randn(norb*nthc + nthc*nthc)
+        else:
+            numpy.random.seed(random_seed)
+            x = numpy.random.randn(norb*nthc + nthc*nthc)
+    else:
+        x = initial_guess  # add more checks here for safety
+
+    # compute inital lambda to set penalty param
+    etaPp = x[:norb*nthc].reshape(nthc,norb)  # leaf tensor  nthc x norb
+    MPQ = x[norb*nthc:norb*nthc+nthc*nthc].reshape(nthc,nthc) # central tensor
+    SPQ = etaPp.dot(etaPp.T)  # (nthc x norb)  x (norb x nthc) -> (nthc  x nthc) metric
+    cP = jnp.diag(jnp.diag(SPQ))  # grab diagonal elements. equivalent to np.diag(np.diagonal(SPQ))
+    # no sqrts because we have two normalized THC vectors (index by mu and nu) on each side.
+    MPQ_normalized = cP.dot(MPQ).dot(cP)  # get normalized zeta in Eq. 11 & 12
+    lambda_z = jnp.sum(jnp.abs(MPQ_normalized)) * 0.5
+    # lambda_z = jnp.sum(MPQ_normalized**2) * 0.5
+    CprP = jnp.einsum("Pp,Pr->prP", etaPp, etaPp)  # this is einsum('mp,mq->pqm', etaPp, etaPp)
+    Iapprox = jnp.einsum('pqU,UV,rsV->pqrs', CprP, MPQ, CprP, optimize=[(0, 1), (0, 1)])
+    deri = eri - Iapprox
+    # set penalty
+    if penalty_param is None:
+        sum_square_loss = 0.5 * numpy.sum((deri) ** 2)
+        penalty_param = sum_square_loss / lambda_z
+        print("lambda_z {}".format(lambda_z))
+        print("penalty_param {}".format(penalty_param))
+
+    # L-BFGS-B optimization
+    thc_grad = jax.grad(thc_objective_regularized, argnums=[0])
+    print("Initial Grad")
+    print(thc_grad(jnp.array(x), norb, nthc, jnp.array(eri), penalty_param))
+    print()
+    res = minimize(thc_objective_regularized, jnp.array(x),
+                   args=(norb, nthc, jnp.array(eri), penalty_param), method='L-BFGS-B',
+                   jac=thc_grad, options={'disp': None, 'iprint': disp_freq, 'maxiter': maxiter}, callback=callback_func)
+
+    # print(res)
+    params = numpy.array(res.x)
     x = numpy.array(params)
     f = h5py.File(chkfile_name, "w")
     f["etaPp"] = x[:norb*nthc].reshape(nthc,norb)

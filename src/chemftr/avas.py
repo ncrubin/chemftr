@@ -212,8 +212,12 @@ class AVAS(object):
         # Get active space info
             with h5py.File(INTS, "r") as f:
                 num_alpha = int(f['active_nalpha'][()]) 
-                num_beta  = int(f['active_nbeta'][()]) 
-                num_orb   = np.asarray(f['h0'][()]).shape[0]
+                num_beta  = int(f['active_nbeta'][()])
+                try:
+                    num_orb   = np.asarray(f['h0'][()]).shape[0]
+                except KeyError:
+                    num_orb = np.asarray(f['h1'][()]).shape[0]
+
         except FileNotFoundError:
             sys.exit("Inside "+sys._getframe().f_code.co_name+" \
                      \nAVAS Hamiltonian '"+str(INTS)+"' not found. Did you generate it?\
@@ -223,10 +227,11 @@ class AVAS(object):
 
         # Reference calculation (dim = None is full cholesky / exact ERIs)                                   
         # run silently                                                                                       
-        with RunSilent():
-            escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=INTS,use_kernel=USE_KERNEL)                 
+        #with RunSilent():
+        escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=INTS,use_kernel=USE_KERNEL)
                                                                                                              
-        exact_ecor = ecor                                                                                    
+        exact_ecor = ecor
+        exact_etot = etot
     
         filename = 'single_factorization_'+self.name+'.txt'
     
@@ -241,17 +246,18 @@ class AVAS(object):
             print("{}".format('-'*89),file=f)                                                                           
         for rank in rank_range:                                                                        
             # run silently                                                                                   
-            with RunSilent():
+            # with RunSilent():
     
-                # First, up: lambda and CCSD(T)
-                n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=INTS)                     
-                escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=INTS, use_kernel=USE_KERNEL)           
-                error = (ecor - exact_ecor)*1E3  # to mEh                                                        
+            # First, up: lambda and CCSD(T)
+            n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=INTS)
+            escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=INTS, use_kernel=USE_KERNEL)
+            error = (etot - exact_etot)*1E3  # to mEh
           
-                # now do costing
-                stps1 = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI, stps=20000)[0]
-                sf_cost, sf_total_cost, sf_logical_qubits = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI,
-                                                                        stps=stps1)
+            # now do costing
+            stps1 = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI, stps=20000)[0]
+            sf_cost, sf_total_cost, sf_logical_qubits = sf.compute_cost(n_orb, lam, DE, L=rank, chi=CHI,
+                                                                    stps=stps1)
+
             with open(filename,'a') as f:
                 print("{:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(rank,lam,error, sf_logical_qubits, sf_total_cost),file=f)                                       
         with open(filename,'a') as f:
@@ -274,8 +280,11 @@ class AVAS(object):
             # Get active space info
             with h5py.File(INTS, "r") as f:
                 num_alpha = int(f['active_nalpha'][()]) 
-                num_beta  = int(f['active_nbeta'][()]) 
-                num_orb   = np.asarray(f['h0'][()]).shape[0]
+                num_beta  = int(f['active_nbeta'][()])
+                try:
+                    num_orb   = np.asarray(f['h0'][()]).shape[0]
+                except KeyError:
+                    num_orb  = np.asarray(f['h1'][()]).shape[0]
         except FileNotFoundError:
             sys.exit("Inside "+sys._getframe().f_code.co_name+" \
                      \nAVAS Hamiltonian '"+str(INTS)+"' not found. Did you generate it?\
@@ -290,7 +299,8 @@ class AVAS(object):
         with RunSilent():
             escf, ecor, etot = df.compute_ccsd_t(thresh=0.0,integral_path=INTS,use_kernel=USE_KERNEL)                 
                                                                                                              
-        exact_ecor = ecor                                                                                    
+        exact_ecor = ecor
+        exact_etot = etot
     
         filename = 'double_factorization_'+self.name+'.txt'
     
@@ -305,15 +315,15 @@ class AVAS(object):
             print("{}".format('-'*120),file=f)                                                                           
         for thresh in thresh_range:                                                                        
             # run silently                                                                                   
-            with RunSilent(): 
-                # First, up: lambda and CCSD(T)
-                n_orb, lam, L, Lxi = df.compute_lambda(thresh, integral_path=INTS)                     
-                escf, ecor, etot = df.compute_ccsd_t(thresh, integral_path=INTS, use_kernel=USE_KERNEL)           
-                error = (ecor - exact_ecor)*1E3  # to mEh                                                        
+            # with RunSilent():
+            # First, up: lambda and CCSD(T)
+            n_orb, lam, L, Lxi = df.compute_lambda(thresh, integral_path=INTS)
+            escf, ecor, etot = df.compute_ccsd_t(thresh, integral_path=INTS, use_kernel=USE_KERNEL)
+            error = (etot - exact_etot)*1E3  # to mEh
           
-                # now do costing
-                stps1 = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=20000)[0]
-                df_cost, df_total_cost, df_logical_qubits = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=stps1)
+            # now do costing
+            stps1 = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=20000)[0]
+            df_cost, df_total_cost, df_logical_qubits = df.compute_cost(n_orb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=stps1)
     
             with open(filename,'a') as f:
                 print("{:^12.6f} {:^12} {:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(thresh,L,Lxi,lam,error, df_logical_qubits, df_total_cost),file=f)                                       

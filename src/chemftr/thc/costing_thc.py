@@ -196,16 +196,17 @@ def cost_thc(n: int, lam: float, dE: float, chi: int, beta: int, M: int, stps: i
 
 
     # Sanity checks before returning as int
-    assert cost.is_integer()
-    assert iters.is_integer()
-    assert aca.is_integer()
-    assert ac12.is_integer()
-    assert acc.is_integer()
+    # assert cost.is_integer()
+    # assert iters.is_integer()
+    # assert aca.is_integer()
+    # assert ac12.is_integer()
+    # assert acc.is_integer()
 
     step_cost = int(cost)
     total_cost = int(cost * iters)
     ancilla_cost = int(np.max([aca + ac12, aca + acc]))
 
+    # step-cost, Toffoli count, logical qubits
     return step_cost, total_cost, ancilla_cost
 
 

@@ -146,7 +146,13 @@ def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[
         try:
             h1  = np.asarray(f['h0'][()])
         except KeyError:
-            h1  = np.asarray(f['hcore'][()])
+            try:
+                h1  = np.asarray(f['hcore'][()])
+            except KeyError:
+                try:
+                    h1 = np.asarray(f['h1'][()])
+                except KeyError:
+                    raise KeyError("Could not find 1-electron Hamiltonian")
         # ecore sometimes exists, and sometimes as enuc (no frozen electrons) ... set to zero if N/A
         try:
             ecore = float(f['ecore'][()])
