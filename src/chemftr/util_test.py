@@ -76,7 +76,7 @@ def test_full_ccsd_t():
         # Do PySCF CCSD(T)
         mycc = cc.CCSD(mf)
         mycc.max_cycle = 500
-        mycc.conv_tol = 1E-7
+        mycc.conv_tol = 1E-9
         mycc.conv_tol_normt = 1E-5
         mycc.diis_space = 24
         mycc.diis_start_cycle = 4
