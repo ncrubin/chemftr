@@ -254,6 +254,8 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         num_beta (int) - number of spin beta electrons in Hamiltonian
         eri_full (ndarray) - optional 4D tensor containing full (i.e. not rank-reduced) two-body
             terms (MO basis) for the SCF procedure only
+        use_kernel (bool) - re-run SCF prior to doing CCSD(T)?
+        no_triples (bool) - skip the perturbative triples correction? (e.g. just do CCSD)
 
     Returns:
         e_scf (float) - SCF energy
@@ -308,9 +310,10 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     w, v = np.linalg.eigh(mf.get_fock())
     mf.mo_energy = w
 
-    # This option should not be used other than for debugging, as it will rotate the interaction
-    # tensors into a new basis. However, sometimes it is useful to see if the "converged SCF" that 
-    # is read in is really converged or not ...
+    # Rotate the interaction tensors into the canonical basis.
+    # Reiher and Li tensors, for example, are read-in in the local MO basis, which is not 
+    # optimal for the CCSD(T) calculation (canonical gives better energy estimate whereas QPE is 
+    # invariant to choice of basis)
     if use_kernel: 
         mf.conv_tol = 1e-9
         mf.init_guess = '1e'
@@ -326,19 +329,21 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         mol = mf.stability()[0]
         dm = mf.make_rdm1(mol, mf.mo_occ)
         mf = mf.run(dm)
-        #save_cas('eri_reiher_newscf.h5',*gen_cas(mf,h1.shape[0],num_alpha + num_beta))
-        mf._eri = eri # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
 
-        # Check SCF has not changed by doing restart!
-        print(scf_energy, mf.e_tot)
+        # Check if SCF has changed by doing restart, and print warning if so
         try:
             assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
         except AssertionError:
             print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
-            print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
+            print("  Will use E(SCF) = {:12.6f} from mf.kernel going forward.".format(mf.e_tot))
+        print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
 
-    # Now set the eri's to the (possibly rank-reduced) ERIs
-    mf._eri = eri # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
+        # New SCF energy and orbitals for CCSD(T), so set scf_energy to new SCF value 
+        scf_energy = mf.e_tot
+
+
+    # Now re-set the eri's to the (possibly rank-reduced) ERIs
+    mf._eri = eri 
     mf.mol.incore_anyway = True
 
     mycc = cc.CCSD(mf)
@@ -355,11 +360,10 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     else:
         et = mycc.ccsd_t()
 
-    e_scf = scf_energy 
+    e_scf = scf_energy  # may be read-in value or 'fresh' SCF value, depending on `use_kernel` KW
     e_cor = mycc.e_corr + et
     e_tot = e_scf + e_cor
 
-    print("E(SCF, ints): ", scf_energy)
     print("E(SCF):       ", e_scf)
     print("E(cor):       ", e_cor)
     print("Total energy: ", e_tot)
@@ -412,7 +416,7 @@ if __name__ == '__main__':
             mf = scf.ROHF(mol) 
 
         mf.init_guess = 'mindo'
-        mf.conv_tol = 1e-10
+        mf.conv_tol = 1e-9
         mf.kernel()
         mo1 = mf.stability()[0]
         dm1 = mf.make_rdm1(mo1, mf.mo_occ)
@@ -421,8 +425,8 @@ if __name__ == '__main__':
         # Do PySCF CCSD(T)
         mycc = cc.CCSD(mf)
         mycc.max_cycle = 500
-        mycc.conv_tol = 1E-7
-        mycc.conv_tol_normt = 1E-5
+        mycc.conv_tol = 1E-8
+        mycc.conv_tol_normt = 1E-4
         mycc.diis_space = 24
         mycc.diis_start_cycle = 4
         mycc.kernel()
@@ -463,7 +467,7 @@ if __name__ == '__main__':
             mf = scf.ROHF(mol) 
 
         mf.init_guess = 'mindo'
-        mf.conv_tol = 1e-10
+        mf.conv_tol = 1e-9
         mf.kernel()
         mo1 = mf.stability()[0]
         dm1 = mf.make_rdm1(mo1, mf.mo_occ)
