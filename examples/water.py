@@ -65,5 +65,5 @@ pyscf_results = np.array([pyscf_escf, pyscf_ecor, pyscf_etot])
 print("E(cor, local):       ", pyscf_ecor)
 print("E(CCSD(T), local):   ", pyscf_etot)
 
-norb, ne, avas_orbs = cas_from_avas(mf,ao_list=['H 1s', 'O 2s', 'O 2p'], verbose = True)
+norb, ne, avas_orbs = get_avas_active_space(mf,ao_list=['H 1s', 'O 2s', 'O 2p'])
 

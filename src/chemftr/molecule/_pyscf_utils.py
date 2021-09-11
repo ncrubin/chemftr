@@ -67,7 +67,7 @@ def localize(pyscf_mf, loc_type='pm', verbose=0):
 
     return pyscf_mf
 
-def cas_from_avas(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs): 
+def get_avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs): 
     """ Return active space and re-ordered orbitals from AVAS 
 
     Args:
@@ -85,7 +85,7 @@ def cas_from_avas(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals'
         reordered_orbitals: orbital initial guess for CAS
     """
 
-    # Note: requires openshell_option = 3 for this to work
+    # Note: requires openshell_option = 3 for this to work, which keeps all singly occupied in CAS
     # we also require canonicalize = False so that we don't destroy local orbitals
     avas_output = avas.avas(pyscf_mf, ao_list, canonicalize=False, openshell_option=3,**kwargs)
     active_norb, active_ne, reordered_orbitals = avas_output
