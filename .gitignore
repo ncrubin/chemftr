@@ -119,3 +119,6 @@ dmypy.json
 
 # ignore profiling files
 *.profile
+
+# ignore vim swap files
+*.swp
