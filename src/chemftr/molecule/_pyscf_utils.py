@@ -4,7 +4,8 @@ import numpy as np
 import h5py
 import sys
 from typing import Optional
-from pyscf import gto, scf, ao2mo, ci, cc, fci, mp, mcscf, lo
+from pyscf import gto, scf, ao2mo, ci, cc, fci, mp, mcscf, lo, tools
+from pyscf.mcscf import avas
 
 def stability(pyscf_mf):
     """
@@ -65,6 +66,46 @@ def localize(pyscf_mf, loc_type='pm', verbose=0):
     pyscf_mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
 
     return pyscf_mf
+
+def cas_from_avas(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs): 
+    """ Return active space and re-ordered orbitals from AVAS 
+
+    Args:
+        pyscf_mf:  PySCF mean field object
+        ao_list: list of strings of AOs (print mol.ao_labels() to see options)
+                 Example: ao_list = ['H 1s', 'O 2p', 'O 2s'] for water
+        verbose (bool): do additional print
+        molden_fname (str): MOLDEN filename to save AVAS active space orbitals. Default is to save
+                            to 'avas_localized_orbitals.molden' 
+        **kwargs: other keyworded arguments to pass into avas.avas()
+
+    Returns:
+        active_norb (int): number of active orbitals selected by AVAS
+        active_ne (int): number of active electrons selected by AVAS
+        reordered_orbitals: orbital initial guess for CAS
+    """
+
+    # Note: requires openshell_option = 3 for this to work
+    # we also require canonicalize = False so that we don't destroy local orbitals
+    avas_output = avas.avas(pyscf_mf, ao_list, canonicalize=False, openshell_option=3,**kwargs)
+    active_norb, active_ne, reordered_orbitals = avas_output
+
+    active_alpha, active_beta = get_num_active_alpha_beta(pyscf_mf, active_ne)
+
+    if molden_fname is not None:
+        # save set of localized orbitals for active space
+        if isinstance(pyscf_mf, scf.rohf.ROHF):
+            frozen_alpha = pyscf_mf.nelec[0] - active_alpha
+            assert frozen_alpha >= 0
+        else:
+            frozen_alpha = pyscf_mf.mol.nelectron // 2  - active_alpha
+            assert frozen_alpha >= 0
+
+        active_space_idx = slice(frozen_alpha, frozen_alpha + active_norb)
+        active_mos = reordered_orbitals[:,active_space_idx]
+        tools.molden.from_mo(pyscf_mf.mol, molden_fname+'.molden', mo_coeff=active_mos)
+
+    return active_norb, active_ne, reordered_orbitals
 
 
 def load_cas(fname, num_alpha: Optional[int] = None, num_beta: Optional[int] = None):
@@ -199,6 +240,11 @@ def gen_cas(pyscf_mf, cas_orbitals: Optional[int] = None,
     eri = ao2mo.restore('s1', eri, h1.shape[0])  # chemist convention (11|22)
     ecore = float(ecore)
 
+    num_alpha, num_beta = get_num_active_alpha_beta(pyscf_mf, cas_electrons) 
+
+    return h1, eri, ecore, num_alpha, num_beta 
+
+def get_num_active_alpha_beta(pyscf_mf, cas_electrons):
     # Sanity checks and active space info
     total_electrons = pyscf_mf.mol.nelectron
     frozen_electrons  = total_electrons - cas_electrons
@@ -217,7 +263,7 @@ def gen_cas(pyscf_mf, cas_orbitals: Optional[int] = None,
         num_alpha = cas_electrons // 2
         num_beta  = cas_electrons // 2
 
-    return h1, eri, ecore, num_alpha, num_beta 
+    return num_alpha, num_beta
 
 def save_cas(fname, pyscf_mf, cas_orbitals: Optional[int] = None, 
              cas_electrons: Optional[int] = None, avas_orbs=None):
