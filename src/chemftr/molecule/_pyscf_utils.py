@@ -34,6 +34,17 @@ def localize(pyscf_mf, loc_type='pm', verbose=0):
     Returns:
         pyscf_mf:  Updated PySCF mean field object with localized orbitals
     """
+    # Note: After loading with `load_cas()` you can shut up this message by resetting mf.mol, 
+    #     i.e., mf.mol = gto.M(...)
+    # but this assumes you have the *exact* molecular specification on hand. I've gotten acceptable  
+    # results by restoring mf.mol this way (usually followed by calling mf.kernel()). But consistent 
+    # localization is not a given (not unique) despite restoring data this way, hence the message. 
+    if len(pyscf_mf.mol.atom) == 0:
+        sys.exit("`localize()` requires atom locations and an atomic basis to be defined.\n  " + \
+                 "It also can be sensitive to the initial guess and MO coefficients.\n  " + \
+                 "Best to try re-creating the PySCF molecule and doing the SCF, rather than\n  " + \
+                 "try to load the mean-field object with `load_cas()`. You can try to\n  " + \
+                 "provide the missing information, but accuracy/consistency cannot be guaranteed!")
 
     # Split-localization (localize doubly-occupied, singly-occupied, and virtual separately)
     docc_idx = np.where(np.isclose(pyscf_mf.mo_occ, 2.))[0]

@@ -1,5 +1,4 @@
 from pyscf import gto, scf, lo, tools, mcscf, ao2mo, cc
-from pyscf.mcscf import avas
 import h5py
 from chemftr.util import gen_cas, RunSilent
 from chemftr.molecule import *
@@ -19,7 +18,7 @@ print("E(SCF, canon) ", mf.e_tot)  # After SCF, energy is true HF variational en
 
 # Saving and loading is pretty easy now 
 save_cas('reiher.h5',mf)
-mol, mf = load_cas('reiher.h5')
+mol , mf = load_cas('reiher.h5')
 
 # Try CCSD(T) on re-loaded canonical Reiher Hamiltonian
 mycc = cc.CCSD(mf)
