@@ -14,5 +14,3 @@
 
 from .compute_lambda_df import compute_lambda
 from .costing_df import compute_cost
-from .compute_ccsd_t import compute_ccsd_t
-

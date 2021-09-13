@@ -1,10 +1,10 @@
 """ Drivers for various PySCF electronic structure routines """
 
-from typing import Optional
+from typing import Tuple, Optional
 import sys
 import h5py
 import numpy as np
-from pyscf import gto, scf, ao2mo, mcscf, lo, tools
+from pyscf import gto, scf, ao2mo, mcscf, lo, tools, cc
 from pyscf.mcscf import avas
 
 def stability(pyscf_mf):
@@ -332,3 +332,153 @@ def save_pyscf_to_casfile(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
         fid.create_dataset('eri', data=eri)
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
+
+def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True) -> Tuple[float, float, float]:
+    """ Compute CCSD(T) energy using rank-reduced ERIs 
+
+    Args:
+        pyscf_mf - PySCF mean field object
+        eri_rr (ndarray) - rank-reduced ERIs, otherwise use full ERIs from pyscf_mf
+        use_kernel (bool) - re-do SCF, using canonical orbitals for one-body contributions?
+
+    Returns:
+        e_scf (float) - SCF energy
+        e_cor (float) - Correlation energy from CCSD(T)
+        e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
+    """
+    h1, eri_full, ecore, num_alpha, num_beta = pyscf_to_cas(pyscf_mf)
+
+    # If no rank-reduced ERIs, use the full (possibly localized) ERIs from pyscf_mf
+    if eri_rr is None:
+        eri_rr = eri_full
+
+    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full, use_kernel)
+
+    return e_scf, e_cor, e_tot
+
+def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=True, \
+    no_triples=False) -> Tuple[float, float, float]:
+    """ Helper function to do CCSD(T) on set of one- and two-body Hamiltonian elements
+
+    Args:
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis), may be rank-reduced
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha (int) - number of spin alpha electrons in Hamiltonian
+        num_beta (int) - number of spin beta electrons in Hamiltonian
+        eri_full (ndarray) - optional 4D tensor containing full (i.e. not rank-reduced) two-body
+            terms (MO basis) for the SCF procedure only
+        use_kernel (bool) - re-run SCF prior to doing CCSD(T)?
+        no_triples (bool) - skip the perturbative triples correction? (e.g. just do CCSD)
+
+    Returns:
+        e_scf (float) - SCF energy
+        e_cor (float) - Correlation energy from CCSD(T)
+        e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
+    """
+
+    mol = gto.M()
+    mol.nelectron = num_alpha + num_beta
+    n_orb = h1.shape[0]
+    alpha_diag = [1] * num_alpha + [0] * (n_orb - num_alpha)
+    beta_diag  = [1] * num_beta  + [0] * (n_orb - num_beta)
+
+    # If eri_full not provided, use (possibly rank-reduced) ERIs for SCF and SCF energy check
+    if eri_full is None:
+        eri_full = eri
+
+    # Assumes Hamiltonian is either RHF or ROHF ... should be OK since UHF will have two h1s, etc.
+    if num_alpha == num_beta:
+        mf = scf.RHF(mol)
+        scf_energy = ecore + \
+                     2*np.einsum('ii',h1[:num_alpha,:num_alpha]) + \
+                     2*np.einsum('iijj',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha]) - \
+                       np.einsum('ijji',eri_full[:num_alpha,:num_alpha,:num_alpha,:num_alpha])
+
+    else:
+        mf = scf.ROHF(mol)
+        mf.nelec = (num_alpha, num_beta)
+        # grab singly and doubly occupied orbitals (assumes high-spin open shell)
+        docc = slice(None                    , min(num_alpha, num_beta))
+        socc = slice(min(num_alpha, num_beta), max(num_alpha, num_beta))
+        scf_energy = ecore + \
+                     2.0*np.einsum('ii',h1[docc, docc]) + \
+                         np.einsum('ii',h1[socc, socc]) + \
+                     2.0*np.einsum('iijj',eri_full[docc, docc, docc, docc]) - \
+                         np.einsum('ijji',eri_full[docc, docc, docc, docc]) + \
+                         np.einsum('iijj',eri_full[socc, socc, docc, docc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, docc, docc, socc]) + \
+                         np.einsum('iijj',eri_full[docc, docc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[docc, socc, socc, docc]) + \
+                     0.5*np.einsum('iijj',eri_full[socc, socc, socc, socc]) - \
+                     0.5*np.einsum('ijji',eri_full[socc, socc, socc, socc])
+
+    mf.get_hcore  = lambda *args: np.asarray(h1)
+    mf.get_ovlp   = lambda *args: np.eye(h1.shape[0])
+    mf.energy_nuc = lambda *args: ecore
+    mf._eri = eri_full # ao2mo.restore('8', np.zeros((8, 8, 8, 8)), 8)
+
+    mf.init_guess = '1e'
+    mf.mo_coeff = np.eye(n_orb)
+    mf.mo_occ = np.array(alpha_diag) + np.array(beta_diag)
+    w, v = np.linalg.eigh(mf.get_fock())
+    mf.mo_energy = w
+
+    # Rotate the interaction tensors into the canonical basis.
+    # Reiher and Li tensors, for example, are read-in in the local MO basis, which is not 
+    # optimal for the CCSD(T) calculation (canonical gives better energy estimate whereas QPE is 
+    # invariant to choice of basis)
+    if use_kernel: 
+        mf.conv_tol = 1e-9
+        mf.init_guess = '1e'
+        mf.verbose=4
+        mf.diis_space = 24
+        mf.diis_start_cycle = 4
+        mf.level_shift = 0.25
+        mf.max_cycle = 500 
+        mf.kernel()
+        mol = mf.stability()[0]
+        dm = mf.make_rdm1(mol, mf.mo_occ)
+        mf = mf.run(dm)
+        mol = mf.stability()[0]
+        dm = mf.make_rdm1(mol, mf.mo_occ)
+        mf = mf.run(dm)
+
+        # Check if SCF has changed by doing restart, and print warning if so
+        try:
+            assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
+        except AssertionError:
+            print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
+            print("  Will use E(SCF) = {:12.6f} from mf.kernel going forward.".format(mf.e_tot))
+        print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
+
+        # New SCF energy and orbitals for CCSD(T), so set scf_energy to new SCF value 
+        scf_energy = mf.e_tot
+
+
+    # Now re-set the eri's to the (possibly rank-reduced) ERIs
+    mf._eri = eri 
+    mf.mol.incore_anyway = True
+
+    mycc = cc.CCSD(mf)
+    mycc.max_cycle = 800
+    mycc.conv_tol = 1E-8
+    mycc.conv_tol_normt = 1E-4
+    mycc.diis_space = 24
+    mycc.diis_start_cycle = 4
+    mycc.verbose = 4
+    mycc.kernel()
+
+    if no_triples:
+        et = 0.0
+    else:
+        et = mycc.ccsd_t()
+
+    e_scf = scf_energy  # may be read-in value or 'fresh' SCF value, depending on `use_kernel` KW
+    e_cor = mycc.e_corr + et
+    e_tot = e_scf + e_cor
+
+    print("E(SCF):       ", e_scf)
+    print("E(cor):       ", e_cor)
+    print("Total energy: ", e_tot)
+    return e_scf, e_cor, e_tot
