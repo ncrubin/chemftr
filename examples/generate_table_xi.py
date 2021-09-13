@@ -26,24 +26,19 @@ Table XI. Single low rank factorization data for
 """ 
 import sys
 from chemftr import sf
-from io import StringIO
-
-class NullIO(StringIO):
-    """ Class to replace sys.stdout with silence """
-    def write(self, txt):
-        pass
+from chemftr.util import RunSilent
+from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
 USE_KERNEL = True # do re-run SCF prior to CCSD_T?
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
+reiher_mol, reiher_mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
 
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
-sys.stdout = NullIO()
-escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None,integral_path=REIHER_INTS,\
-                                     num_alpha=27,num_beta=27,use_kernel=USE_KERNEL)
-sys.stdout = sys.__stdout__
+with RunSilent():
+    escf, ecor, etot = rank_reduced_ccsd_t(reiher_mf, eri_rr = None, use_kernel = USE_KERNEL)
 
 exact_ecor = ecor
 
@@ -54,11 +49,9 @@ print("{:^12} {:^12} {:^24}".format('L','lambda','CCSD(T) error (mEh)'))
 print("{}".format('-'*48))
 for rank in range(50,401,25):
     # run silently
-    sys.stdout = NullIO()
-    n_orb, lam = sf.compute_lambda(cholesky_dim=rank, integral_path=REIHER_INTS)
-    escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=rank, integral_path=REIHER_INTS,
-                                         num_alpha=27,num_beta=27,  use_kernel=USE_KERNEL)
-    error = (ecor - exact_ecor)*1E3  # to mEh
-    sys.stdout = sys.__stdout__
+    with RunSilent():
+        n_orb, lam, eri_rr = sf.compute_lambda(reiher_mf, cholesky_dim=rank)
+        escf, ecor, etot   = rank_reduced_ccsd_t(reiher_mf, eri_rr) 
+        error = (ecor - exact_ecor)*1E3  # to mEh
     print("{:^12} {:^12.1f} {:^24.2f}".format(rank,lam,error))
 print("{}".format('='*48))

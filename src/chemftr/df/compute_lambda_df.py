@@ -20,6 +20,7 @@ def compute_lambda(pyscf_mf, thresh: float, reduction: str = 'eigendecomp', \
         lambda_tot (float) - lambda value for the double factorized Hamiltonian
         L (int) - the rank of the first decomposition
         Lxi (int) - the total number of eigenvectors
+        eri_rr (ndarray) - the rank-reduced ERI tensor following the DF algorithm to compute lambda
     """
 
     # grab tensors from pyscf_mf object
@@ -28,7 +29,7 @@ def compute_lambda(pyscf_mf, thresh: float, reduction: str = 'eigendecomp', \
     # rank-reduced ints do not exist, so create them
     n_orb = h1.shape[0]  # number of orbitals
 
-    _, lambda_F, R, M = double_factorize(eri_full, thresh, reduction, verify_eri)
+    eri_rr, lambda_F, R, M = double_factorize(eri_full, thresh, reduction, verify_eri)
 
     T = h1 - 0.5 * np.einsum("illj->ij", eri_full) + np.einsum("llij->ij", eri_full)
     e, _ = np.linalg.eigh(T)
@@ -36,7 +37,7 @@ def compute_lambda(pyscf_mf, thresh: float, reduction: str = 'eigendecomp', \
 
     lambda_tot = lambda_T + lambda_F
 
-    return n_orb * 2, lambda_tot, R, M  # return spinorbital number from spatial
+    return n_orb * 2, lambda_tot, R, M, eri_rr  
 
 if __name__ == '__main__':
 
@@ -46,8 +47,8 @@ if __name__ == '__main__':
     NAME = '../integrals/eri_reiher.h5'
     mol, mf = load_casfile_to_pyscf(NAME, num_alpha = 27, num_beta = 27)
     VERIFY=True
-    n_orbital, total_lambda, rank, num_eigen = compute_lambda(mf, thresh=THRESH, verify_eri=VERIFY)
+    n_orbital, lam, rank, num_eigen, _  = compute_lambda(mf, thresh=THRESH, verify_eri=VERIFY)
     assert n_orbital == 108
     assert rank == 360
     assert num_eigen == 13031
-    assert np.isclose(np.round(total_lambda,decimals=1),294.8)
+    assert np.isclose(np.round(lam,decimals=1),294.8)

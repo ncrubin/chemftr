@@ -437,12 +437,8 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         mf.level_shift = 0.25
         mf.max_cycle = 500 
         mf.kernel()
-        mol = mf.stability()[0]
-        dm = mf.make_rdm1(mol, mf.mo_occ)
-        mf = mf.run(dm)
-        mol = mf.stability()[0]
-        dm = mf.make_rdm1(mol, mf.mo_occ)
-        mf = mf.run(dm)
+        mf = stability(mf)
+        mf = stability(mf)
 
         # Check if SCF has changed by doing restart, and print warning if so
         try:
