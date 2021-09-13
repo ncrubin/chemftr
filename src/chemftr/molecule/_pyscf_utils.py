@@ -1,10 +1,10 @@
 """ Drivers for various PySCF electronic structure routines """
 
-import numpy as np
-import h5py
-import sys
 from typing import Optional
-from pyscf import gto, scf, ao2mo, ci, cc, fci, mp, mcscf, lo, tools
+import sys
+import h5py
+import numpy as np
+from pyscf import gto, scf, ao2mo, mcscf, lo, tools
 from pyscf.mcscf import avas
 
 def stability(pyscf_mf):
@@ -24,27 +24,27 @@ def stability(pyscf_mf):
     return pyscf_mf
 
 def localize(pyscf_mf, loc_type='pm', verbose=0):
-    """ Localize orbitals given a PySCF mean-field object 
+    """ Localize orbitals given a PySCF mean-field object
 
     Args:
         pyscf_mf:  PySCF mean field object
-        loc_type (str): localization type; Pipek-Mezey ('pm') or Edmiston-Rudenberg ('er') 
+        loc_type (str): localization type; Pipek-Mezey ('pm') or Edmiston-Rudenberg ('er')
         verbose (int): print level during localization
 
     Returns:
         pyscf_mf:  Updated PySCF mean field object with localized orbitals
     """
-    # Note: After loading with `load_cas()` you can shut up this message by resetting mf.mol, 
+    # Note: After loading with `load_casfile_to_pyscf()` you can quiet message by resetting mf.mol,
     #     i.e., mf.mol = gto.M(...)
-    # but this assumes you have the *exact* molecular specification on hand. I've gotten acceptable  
-    # results by restoring mf.mol this way (usually followed by calling mf.kernel()). But consistent 
-    # localization is not a given (not unique) despite restoring data this way, hence the message. 
+    # but this assumes you have the *exact* molecular specification on hand. I've gotten acceptable
+    # results by restoring mf.mol this way (usually followed by calling mf.kernel()). But consistent
+    # localization is not a given (not unique) despite restoring data this way, hence the message.
     if len(pyscf_mf.mol.atom) == 0:
         sys.exit("`localize()` requires atom locations and an atomic basis to be defined.\n  " + \
                  "It also can be sensitive to the initial guess and MO coefficients.\n  " + \
                  "Best to try re-creating the PySCF molecule and doing the SCF, rather than\n  " + \
-                 "try to load the mean-field object with `load_cas()`. You can try to\n  " + \
-                 "provide the missing information, but accuracy/consistency cannot be guaranteed!")
+                 "try to load the mean-field object with `load_casfile_to_pyscf()`. You can \n " + \
+                 "try to provide the missing information, but consistency cannot be guaranteed!")
 
     # Split-localization (localize doubly-occupied, singly-occupied, and virtual separately)
     docc_idx = np.where(np.isclose(pyscf_mf.mo_occ, 2.))[0]
@@ -71,29 +71,30 @@ def localize(pyscf_mf, loc_type='pm', verbose=0):
         loc_virt_mo = lo.ER(pyscf_mf.mol, pyscf_mf.mo_coeff[:, virt_idx]).kernel(verbose=verbose)
         print("DONE")
 
-    # overwrite orbitals with localized orbitals 
+    # overwrite orbitals with localized orbitals
     pyscf_mf.mo_coeff[:,docc_idx] = loc_docc_mo.copy()
     pyscf_mf.mo_coeff[:,socc_idx] = loc_socc_mo.copy()
     pyscf_mf.mo_coeff[:,virt_idx] = loc_virt_mo.copy()
 
     return pyscf_mf
 
-def get_avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs): 
-    """ Return active space and re-ordered orbitals from AVAS 
+def avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs):
+    """ Return AVAS active space as PySCF molecule and mean-field object 
 
     Args:
         pyscf_mf:  PySCF mean field object
+
+    Kwargs:
         ao_list: list of strings of AOs (print mol.ao_labels() to see options)
                  Example: ao_list = ['H 1s', 'O 2p', 'O 2s'] for water
         verbose (bool): do additional print
         molden_fname (str): MOLDEN filename to save AVAS active space orbitals. Default is to save
-                            to 'avas_localized_orbitals.molden' 
+                            to 'avas_localized_orbitals.molden'
         **kwargs: other keyworded arguments to pass into avas.avas()
 
     Returns:
-        active_norb (int): number of active orbitals selected by AVAS
-        active_ne (int): number of active electrons selected by AVAS
-        reordered_orbitals: orbital initial guess for CAS
+        pyscf_active_space_mol: Updated PySCF molecule object from AVAS-selected active space
+        pyscf_active_space_mf:  Updated PySCF mean field object from AVAS-selected active space
     """
 
     # Note: requires openshell_option = 3 for this to work, which keeps all singly occupied in CAS
@@ -101,7 +102,7 @@ def get_avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_o
     avas_output = avas.avas(pyscf_mf, ao_list, canonicalize=False, openshell_option=3,**kwargs)
     active_norb, active_ne, reordered_orbitals = avas_output
 
-    active_alpha, active_beta = get_num_active_alpha_beta(pyscf_mf, active_ne)
+    active_alpha, _ = get_num_active_alpha_beta(pyscf_mf, active_ne)
 
     if molden_fname is not None:
         # save set of localized orbitals for active space
@@ -116,58 +117,27 @@ def get_avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_o
         active_mos = reordered_orbitals[:,active_space_idx]
         tools.molden.from_mo(pyscf_mf.mol, molden_fname+'.molden', mo_coeff=active_mos)
 
-    return active_norb, active_ne, reordered_orbitals
+    # Choosing an active space changes the molecule ("freezing" electrons, for example), so we
+    # form the active space tensors first, then re-form the PySCF objects to ensure consistency
+    pyscf_active_space_mol, pyscf_active_space_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf, 
+        cas_orbitals = active_norb, cas_electrons = active_ne, avas_orbs = reordered_orbitals))
 
+    return pyscf_active_space_mol, pyscf_active_space_mf
 
-def load_cas(fname, num_alpha: Optional[int] = None, num_beta: Optional[int] = None):
-    """ Load CAS Hamiltonian from pre-computed HD5 file into a PySCF mean-field object
+def cas_to_pyscf(h1, eri, ecore, num_alpha, num_beta):
+    """ Return a PySCF molecule and mean-field object from pre-computed CAS Hamiltonian
 
     Args:
-        fname (str): path to hd5 file to be created containing CAS one and two body terms 
-        num_alpha (int, optional): number of spin up electrons in CAS space
-        num_beta (int, optional):  number of spin down electrons in CAS space
-
+        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
+        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
+        ecore (float) - frozen core electronic energy + nuclear repulsion energy
+        num_alpha (int) - number of spin up electrons in CAS space
+        num_beta (int) - number of spin down electrons in CAS space
+    
     Returns:
         pyscf_mol: PySCF molecule object
         pyscf_mf:  PySCF mean field object
     """
-
-    with h5py.File(fname, "r") as f:
-        eri = np.asarray(f['eri'][()])
-        #FIXME: h1 is sometimes called different things. We should make this consistent
-        try:
-            h1  = np.asarray(f['h0'][()])
-        except KeyError:
-            try:
-                h1  = np.asarray(f['hcore'][()])
-            except KeyError:
-                try:
-                    h1 = np.asarray(f['h1'][()])
-                except KeyError:
-                    raise KeyError("Could not find 1-electron Hamiltonian")
-        # ecore sometimes exists, and sometimes as enuc (no frozen electrons) ... set to zero if N/A
-        try:
-            ecore = float(f['ecore'][()])
-        except KeyError:
-            try:
-                ecore = float(f['enuc'][()])
-            except KeyError:
-                ecore = 0.0
-        # attempt to read the number of spin up and spin down electrons if not input directly
-        # FIXME: make hd5 key convention consistent
-        if (num_alpha is None) or (num_beta is None):
-            try:
-                num_alpha = int(f['active_nalpha'][()])
-            except KeyError:
-                sys.exit("In `load_cas`: \n" + \
-                         " No values found on file for num_alpha (key: 'active_nalpha' in h5). " + \
-                         " Try passing in a value for num_alpha, or re-check integral file.")
-            try:
-                num_beta = int(f['active_nbeta'][()])
-            except KeyError:
-                sys.exit("In `load_cas`: \n" + \
-                         " No values found on file for num_beta (key: 'active_nbeta' in h5). " + \
-                         " Try passing in a value for num_beta, or re-check integral file.")
 
     n_orb = len(h1)  # number orbitals
     assert [n_orb] * 4 == [*eri.shape]  # check dims are consistent
@@ -214,17 +184,17 @@ def load_cas(fname, num_alpha: Optional[int] = None, num_beta: Optional[int] = N
     pyscf_mf.init_guess = '1e'
     pyscf_mf.mo_coeff = np.eye(n_orb)
     pyscf_mf.mo_occ = np.array(alpha_diag) + np.array(beta_diag)
-    w, v = np.linalg.eigh(pyscf_mf.get_fock())
-    pyscf_mf.mo_energy = w
+    #FIXME: Should we overwrite mo_coeff as well after diagonalizing fock?
+    pyscf_mf.mo_energy, _ = np.linalg.eigh(pyscf_mf.get_fock())
 
     return pyscf_mol, pyscf_mf
 
-def gen_cas(pyscf_mf, cas_orbitals: Optional[int] = None,
-             cas_electrons: Optional[int] = None, avas_orbs=None):
-    """ Return CAS Hamiltonian tensors from a PySCF mean-field object 
+def pyscf_to_cas(pyscf_mf, cas_orbitals: Optional[int] = None,
+             cas_electrons: Optional[int] = None, avas_orbs = None):
+    """ Return CAS Hamiltonian tensors from a PySCF mean-field object
 
     Args:
-        pyscf_mf: PySCF mean field object 
+        pyscf_mf: PySCF mean field object
         cas_orbitals (int, optional):  number of orbitals in CAS space, default all orbitals
         cas_electrons (int, optional): number of electrons in CAS space, default all electrons
         avas_orbs (ndarray, optional): orbitals selected by AVAS in PySCF
@@ -251,11 +221,23 @@ def gen_cas(pyscf_mf, cas_orbitals: Optional[int] = None,
     eri = ao2mo.restore('s1', eri, h1.shape[0])  # chemist convention (11|22)
     ecore = float(ecore)
 
-    num_alpha, num_beta = get_num_active_alpha_beta(pyscf_mf, cas_electrons) 
+    num_alpha, num_beta = get_num_active_alpha_beta(pyscf_mf, cas_electrons)
 
-    return h1, eri, ecore, num_alpha, num_beta 
+    return h1, eri, ecore, num_alpha, num_beta
 
+# FIXME: make cas_electrons an optional argument and default to full number of electrons?
 def get_num_active_alpha_beta(pyscf_mf, cas_electrons):
+    """ Return number of alpha and beta electrons in the active space given number of CAS electrons
+        This assumes that all the unpaired electrons are in the active space
+
+    Args:
+        pyscf_mf: PySCF mean field object
+        cas_orbitals (int):  number of electrons in CAS space,
+
+    Returns:
+        num_alpha (int): number of alpha (spin-up) electrons in active space
+        num_beta (int):  number of beta (spin-down) electrons in active space
+    """
     # Sanity checks and active space info
     total_electrons = pyscf_mf.mol.nelectron
     frozen_electrons  = total_electrons - cas_electrons
@@ -276,18 +258,73 @@ def get_num_active_alpha_beta(pyscf_mf, cas_electrons):
 
     return num_alpha, num_beta
 
-def save_cas(fname, pyscf_mf, cas_orbitals: Optional[int] = None, 
-             cas_electrons: Optional[int] = None, avas_orbs=None):
-    """ Save CAS Hamiltonian from a PySCF mean-field object to an HD5 file 
+def load_casfile_to_pyscf(fname, num_alpha: Optional[int] = None, num_beta: Optional[int] = None):
+    """ Load CAS Hamiltonian from pre-computed HD5 file into a PySCF molecule and mean-field object
 
     Args:
         fname (str): path to hd5 file to be created containing CAS one and two body terms
-        pyscf_mf: PySCF mean field object 
+        num_alpha (int, optional): number of spin up electrons in CAS space
+        num_beta (int, optional):  number of spin down electrons in CAS space
+
+    Returns:
+        pyscf_mol: PySCF molecule object
+        pyscf_mf:  PySCF mean field object
+    """
+
+    with h5py.File(fname, "r") as f:
+        eri = np.asarray(f['eri'][()])
+        # h1 one body elements are sometimes called different things. Try the common ones.
+        try:
+            h1  = np.asarray(f['h0'][()])
+        except KeyError:
+            try:
+                h1  = np.asarray(f['hcore'][()])
+            except KeyError:
+                try:
+                    h1 = np.asarray(f['h1'][()])
+                except KeyError:
+                    raise KeyError("Could not find 1-electron Hamiltonian")
+        # ecore sometimes exists, and sometimes as enuc (no frozen electrons) ... set to zero if N/A
+        try:
+            ecore = float(f['ecore'][()])
+        except KeyError:
+            try:
+                ecore = float(f['enuc'][()])
+            except KeyError:
+                ecore = 0.0
+        # attempt to read the number of spin up and spin down electrons if not input directly
+        # FIXME: make hd5 key convention consistent
+        if (num_alpha is None) or (num_beta is None):
+            try:
+                num_alpha = int(f['active_nalpha'][()])
+            except KeyError:
+                sys.exit("In `load_casfile_to_pyscf()`: \n" + \
+                         " No values found on file for num_alpha (key: 'active_nalpha' in h5). " + \
+                         " Try passing in a value for num_alpha, or re-check integral file.")
+            try:
+                num_beta = int(f['active_nbeta'][()])
+            except KeyError:
+                sys.exit("In `load_casfile_to_pyscf()`: \n" + \
+                         " No values found on file for num_beta (key: 'active_nbeta' in h5). " + \
+                         " Try passing in a value for num_beta, or re-check integral file.")
+
+    pyscf_mol, pyscf_mf = cas_to_pyscf(h1, eri, ecore, num_alpha, num_beta)
+
+    return pyscf_mol, pyscf_mf
+
+def save_pyscf_to_casfile(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
+             cas_electrons: Optional[int] = None, avas_orbs=None):
+    """ Save CAS Hamiltonian from a PySCF mean-field object to an HD5 file
+
+    Args:
+        fname (str): path to hd5 file to be created containing CAS one and two body terms
+        pyscf_mf: PySCF mean field object
         cas_orbitals (int, optional):  number of orbitals in CAS space, default all orbitals
         cas_electrons (int, optional): number of electrons in CAS space, default all electrons
         avas_orbs (ndarray, optional): orbitals selected by AVAS in PySCF
     """
-    h1, eri, ecore, num_alpha, num_beta = gen_cas(pyscf_mf, cas_orbitals, cas_electrons, avas_orbs)
+    h1, eri, ecore, num_alpha, num_beta = \
+        pyscf_to_cas(pyscf_mf, cas_orbitals, cas_electrons, avas_orbs)
 
     with h5py.File(fname, 'w') as fid:
         fid.create_dataset('ecore', data=float(ecore), dtype=float)
@@ -295,4 +332,3 @@ def save_cas(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
         fid.create_dataset('eri', data=eri)
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
-

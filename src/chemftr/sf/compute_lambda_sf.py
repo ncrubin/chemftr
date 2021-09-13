@@ -2,16 +2,18 @@
 from typing import Tuple
 import numpy as np
 from chemftr.rank_reduce import single_factorize
-from chemftr.util import read_cas
+from chemftr.molecule import pyscf_to_cas
 
 
-def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eigendecomp', \
+def compute_lambda(pyscf_mf, cholesky_dim: int, reduction: str = 'eigendecomp', \
     verify_eri: bool = False) -> Tuple[int, float]:
     """ Compute lambda for Hamiltonian using SF method of Berry, et al.
 
     Args:
+        pyscf_mf - PySCF mean field object
         cholesky_dim (int) - dimension to retain in Cholesky for low-rank reconstruction of ERIs
-        integral_path (str) - path to file which integrals to use; assumes hdf5 with 'h0' and 'eri'
+
+    Kwargs:
         reduction (str) -  method to rank-reduce ERIs. 'cholesky' or 'eigendecomp'
         verify_eri (bool) - check full cholesky integrals and ERIs are equivalent to epsilon
 
@@ -20,8 +22,8 @@ def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eige
         lambda_tot (float) - lambda value for the single factorized Hamiltonian
     """
 
-    # read in integrals, we don't care about num_electrons here so pass in dummy variables
-    h1, eri_full, _, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
+    # grab tensors from pyscf_mf object
+    h1, eri_full, _, _, _ = pyscf_to_cas(pyscf_mf)
 
     # compute the rank-reduced eri tensors (LR.LR^T ~= ERI)
     _, LR = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
@@ -40,12 +42,12 @@ def compute_lambda(cholesky_dim: int, integral_path: str, reduction: str = 'eige
 
 
 if __name__ == '__main__':
+    from chemftr.molecule import load_casfile_to_pyscf
 
     CHOL_DIM = 200
-    NAME = '../integrals/eri_reiher.h5'
+    mol, mf = load_casfile_to_pyscf('../integrals/eri_reiher.h5',num_alpha = 27, num_beta = 27)
     VERIFY=True
-    number_orbitals, total_lambda = compute_lambda(cholesky_dim=CHOL_DIM,
-        integral_path=NAME,verify_eri=VERIFY)
+    number_orbitals, total_lambda = compute_lambda(mf, cholesky_dim = CHOL_DIM, verify_eri = VERIFY)
     print(number_orbitals, total_lambda, CHOL_DIM)
     assert number_orbitals == 108
     assert np.isclose(total_lambda,4258.0)
