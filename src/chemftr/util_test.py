@@ -2,7 +2,8 @@
 """
 import numpy as np
 from pyscf import gto, scf, cc
-from chemftr.util import QR, QI, QR2, QI2, power_two, ccsd_t, gen_cas
+from chemftr.util import QR, QI, QR2, QI2, power_two, ccsd_t
+from chemftr.molecule import pyscf_to_cas
 
 
 def test_QR():
@@ -91,7 +92,7 @@ def test_full_ccsd_t():
         n_elec = mol.nelectron
         n_orb = mf.mo_coeff[0].shape[-1]
 
-        chemftr_results = ccsd_t(*gen_cas(mf, n_orb, n_elec))
+        chemftr_results = ccsd_t(*pyscf_to_cas(mf, n_orb, n_elec))
         chemftr_results = np.asarray(chemftr_results)
 
         # ignore relative tolerance, we just want absolute tolerance
@@ -132,7 +133,7 @@ def test_reduced_ccsd_t():
         pyscf_etot = mycas.e_tot
 
         # Don't do triples (it's zero anyway for 2e) b/c div by zero error for ROHF references
-        _, _, chemftr_etot = ccsd_t(*gen_cas(mf, n_orb, n_elec),no_triples=True)
+        _, _, chemftr_etot = ccsd_t(*pyscf_to_cas(mf, n_orb, n_elec),no_triples=True)
 
         # ignore relative tolerance, we just want absolute tolerance
         print("Pyscf:", pyscf_etot, " Chemftr: ", chemftr_etot)

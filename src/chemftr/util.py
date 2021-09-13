@@ -124,124 +124,6 @@ def power_two(m: int) -> int:
         return count
     return 0
 
-def read_cas(integral_path, num_alpha: Optional[int] = None, num_beta: Optional[int] = None):
-    """ Read CAS Hamiltonian from pre-computed HD5 file.
-
-    Args:
-        integral_path (str) - path to hd5 file containing CAS one and two body terms 
-        num_alpha (int, optional) - number of spin up electrons in CAS space
-        num_beta (int, optional) - number of spin down electrons in CAS space
-
-    Returns:
-        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
-        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
-        ecore (float) - frozen core electronic energy + nuclear repulsion energy
-        num_alpha (int) - number of spin up electrons in CAS space
-        num_beta (int) - number of spin down electrons in CAS space
-    """
-
-    with h5py.File(integral_path, "r") as f:
-        eri = np.asarray(f['eri'][()])
-        #FIXME: h1 is sometimes called different things. We should make this consistent
-        try:
-            h1  = np.asarray(f['h0'][()])
-        except KeyError:
-            try:
-                h1  = np.asarray(f['hcore'][()])
-            except KeyError:
-                try:
-                    h1 = np.asarray(f['h1'][()])
-                except KeyError:
-                    raise KeyError("Could not find 1-electron Hamiltonian")
-        # ecore sometimes exists, and sometimes as enuc (no frozen electrons) ... set to zero if N/A
-        try:
-            ecore = float(f['ecore'][()])
-        except KeyError:
-            try:
-                ecore = float(f['enuc'][()])
-            except KeyError:
-                ecore = 0.0
-        # attempt to read the number of spin up and spin down electrons if not input directly
-        # FIXME: make hd5 key convention consistent
-        if (num_alpha is None) or (num_beta is None):
-            try:
-                num_alpha = int(f['active_nalpha'][()])
-            except KeyError:
-                sys.exit("No values found on file for num_alpha (key: 'active_nalpha' in h5). " + \
-                         "Try passing in a value for num_alpha, or re-check integral file.")
-            try:
-                num_beta = int(f['active_nbeta'][()])
-            except KeyError:
-                sys.exit("No values found on file for num_beta (key: 'active_nbeta' in h5). " + \
-                         "Try passing in a value for num_beta, or re-check integral file.")
-
-    n_orb = len(h1)  # number orbitals
-    assert [n_orb] * 4 == [*eri.shape]  # check dims are consistent
-
-    return h1, eri, ecore, num_alpha, num_beta
-
-def gen_cas(mf, cas_orbitals: int, cas_electrons: int, avas_orbs=None):
-    """ Generate CAS Hamiltonian given a PySCF mean field object
-
-    Args:
-        mf (PySCF mean field object) - instantiation of PySCF mean field method class
-        cas_orbitals (int) - number of orbitals in CAS space
-        cas_electrons (int) - number of electrons in CAS space
-
-    Returns:
-        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
-        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
-        ecore (float) - frozen core electronic energy + nuclear repulsion energy
-        num_alpha (int) - number of spin up electrons in CAS space
-        num_beta (int) - number of spin down electrons in CAS space
-    """
-
-    # Only can do RHF or ROHF with mcscf.CASCI
-    assert isinstance(mf, scf.rhf.RHF)  # ROHF inherits RHF class (i.e. ROHF == RHF but RHF != ROHF)
-    cas = mcscf.CASCI(mf, ncas = cas_orbitals, nelecas = cas_electrons)
-    h1, ecore = cas.get_h1eff(mo_coeff = avas_orbs)
-    eri = cas.get_h2cas(mo_coeff = avas_orbs)
-    eri = ao2mo.restore('s1', eri, h1.shape[0])  # chemist convention (11|22)
-    ecore = float(ecore)
-
-    # Sanity checks and active space info
-    total_electrons = mf.mol.nelectron
-    frozen_electrons  = total_electrons - cas_electrons
-    assert frozen_electrons % 2 == 0
-
-    # Again, recall ROHF == RHF but RHF != ROHF, and we only do either RHF or ROHF
-    if isinstance(mf, scf.rohf.ROHF):
-        frozen_alpha = frozen_electrons // 2
-        frozen_beta  = frozen_electrons // 2
-        num_alpha = mf.nelec[0] - frozen_alpha
-        num_beta  = mf.nelec[1] - frozen_beta
-        assert np.isclose(num_beta + num_alpha, cas_electrons)
-
-    else:
-        assert cas_electrons % 2 == 0
-        num_alpha = cas_electrons // 2
-        num_beta  = cas_electrons // 2
-
-    return h1, eri, ecore, num_alpha, num_beta
-
-def save_cas(fname, h1, eri, ecore, num_alpha, num_beta):
-    """ Save CAS Hamiltonian to HD5 file.
-
-    Args:
-        fname (str) - path to hd5 file to be created containing CAS one and two body terms 
-        h1 (ndarray) - 2D matrix containing one-body terms (MO basis)
-        eri (ndarray) - 4D tensor containing two-body terms (MO basis)
-        ecore (float) - frozen core electronic energy + nuclear repulsion energy
-        num_alpha (int) - number of spin alpha electrons in Hamiltonian
-        num_beta (int) - number of spin beta electrons in Hamiltonian
-    """
-    with h5py.File(fname, 'w') as fid:
-        fid.create_dataset('ecore', data=float(ecore), dtype=float)
-        fid.create_dataset('h0', data=h1)  # note the name change to be consistent with THC paper
-        fid.create_dataset('eri', data=eri)
-        fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
-        fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
-
 def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_kernel=True, \
     no_triples=False) -> Tuple[float, float, float]:
     """ Do CCSD(T) on set of one- and two-body Hamiltonian elements
@@ -397,6 +279,8 @@ class RunSilent(object):
 
 if __name__ == '__main__':
 
+    from chemftr.molecule import pyscf_to_cas
+
     print("chemftr full CCSD(T) from h1/eri/ecore tensors vs regular PySCF CCSD(T) ")
     for scf_type in ['rhf', 'rohf']:
         mol = gto.Mole()
@@ -440,7 +324,7 @@ if __name__ == '__main__':
         n_elec = mol.nelectron
         n_orb = mf.mo_coeff[0].shape[-1]
 
-        chemftr_results = ccsd_t(*gen_cas(mf, n_orb, n_elec))
+        chemftr_results = ccsd_t(*pyscf_to_cas(mf, n_orb, n_elec))
         chemftr_results = np.asarray(chemftr_results)
 
         # ignore relative tolerance, we just want absolute tolerance
@@ -481,7 +365,7 @@ if __name__ == '__main__':
         pyscf_etot = mycas.e_tot
 
         # Don't do triples (it's zero anyway for 2e) b/c div by zero error for ROHF references
-        _, _, chemftr_etot = ccsd_t(*gen_cas(mf, n_orb, n_elec),no_triples=True)
+        _, _, chemftr_etot = ccsd_t(*pyscf_to_cas(mf, n_orb, n_elec),no_triples=True)
 
         # ignore relative tolerance, we just want absolute tolerance
         print("Pyscf:", pyscf_etot, " Chemftr: ", chemftr_etot)

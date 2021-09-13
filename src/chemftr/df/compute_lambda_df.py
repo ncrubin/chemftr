@@ -2,16 +2,16 @@
 from typing import Tuple
 import numpy as np
 from chemftr.rank_reduce import double_factorize
-from chemftr.util import read_cas
+from chemftr.molecule import pyscf_to_cas
 
 
-def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendecomp', \
+def compute_lambda(pyscf_mf, thresh: float, reduction: str = 'eigendecomp', \
     verify_eri: bool = False) -> Tuple[int, float]:
     """ Compute lambda for Hamiltonian using DF method of von Burg, et al.
 
     Args:
+        pyscf_mf - Pyscf mean field object
         thresh (float) - dimension to retain in Cholesky for low-rank reconstruction of ERIs
-        integral_path (str) - path to file which integrals to use; assumes hdf5 with 'h0' and 'eri'
         reduction (str) -  method to rank-reduce ERIs. 'cholesky' or 'eigendecomp'
         verify_eri (bool) - check full cholesky integrals and ERIs are equivalent to epsilon
 
@@ -22,7 +22,8 @@ def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendec
         Lxi (int) - the total number of eigenvectors
     """
 
-    h1, eri_full, _, _, _ = read_cas(integral_path, num_alpha=-1, num_beta=-1)
+    # grab tensors from pyscf_mf object
+    h1, eri_full, _, _, _ = pyscf_to_cas(pyscf_mf)
 
     # rank-reduced ints do not exist, so create them
     n_orb = h1.shape[0]  # number of orbitals
@@ -39,11 +40,13 @@ def compute_lambda(thresh: float, integral_path: str, reduction: str = 'eigendec
 
 if __name__ == '__main__':
 
+    from chemftr.molecule import load_casfile_to_pyscf
+
     THRESH = 0.00125
     NAME = '../integrals/eri_reiher.h5'
+    mol, mf = load_casfile_to_pyscf(NAME, num_alpha = 27, num_beta = 27)
     VERIFY=True
-    n_orbital, total_lambda, rank, num_eigen = compute_lambda(thresh=THRESH,
-        integral_path=NAME,verify_eri=VERIFY)
+    n_orbital, total_lambda, rank, num_eigen = compute_lambda(mf, thresh=THRESH, verify_eri=VERIFY)
     assert n_orbital == 108
     assert rank == 360
     assert num_eigen == 13031

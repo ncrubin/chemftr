@@ -2,7 +2,7 @@
 from typing import Tuple
 import numpy as np
 from chemftr.rank_reduce import single_factorize
-from chemftr.util import read_cas, ccsd_t
+from chemftr.util import ccsd_t
 from chemftr.molecule import pyscf_to_cas
 
 def compute_ccsd_t(pyscf_mf, cholesky_dim: int, num_alpha = None, num_beta = None, \
@@ -20,7 +20,7 @@ def compute_ccsd_t(pyscf_mf, cholesky_dim: int, num_alpha = None, num_beta = Non
         e_cor (float) - Correlation energy from CCSD(T)
         e_tot (float) - Total energy; i.e. SCF energy + Correlation energy from CCSD(T)
     """
-    h1, eri_full, ecore, num_alpha, num_beta = pyscf_to_cas(pyscf_mf, num_alpha, num_beta)
+    h1, eri_full, ecore, num_alpha, num_beta = pyscf_to_cas(pyscf_mf)
 
     # compute the rank-reduced eri tensors (LR.LR^T = eri_rr ~= eri_full)
     eri_rr, _ = single_factorize(eri_full, cholesky_dim, reduction, verify_eri)
