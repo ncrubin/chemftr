@@ -33,6 +33,8 @@ from chemftr.molecule import load_casfile_to_pyscf
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
+
+# eri_reiher.h5 can be found at https://doi.org/10.5281/zenodo.4248322
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 reiher_mol, reiher_mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
 

@@ -79,7 +79,7 @@ def localize(pyscf_mf, loc_type='pm', verbose=0):
     return pyscf_mf
 
 def avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbitals', **kwargs):
-    """ Return AVAS active space as PySCF molecule and mean-field object 
+    """ Return AVAS active space as PySCF molecule and mean-field object
 
     Args:
         pyscf_mf:  PySCF mean field object
@@ -119,7 +119,7 @@ def avas_active_space(pyscf_mf, ao_list=None, molden_fname='avas_localized_orbit
 
     # Choosing an active space changes the molecule ("freezing" electrons, for example), so we
     # form the active space tensors first, then re-form the PySCF objects to ensure consistency
-    pyscf_active_space_mol, pyscf_active_space_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf, 
+    pyscf_active_space_mol, pyscf_active_space_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf,
         cas_orbitals = active_norb, cas_electrons = active_ne, avas_orbs = reordered_orbitals))
 
     return pyscf_active_space_mol, pyscf_active_space_mf
@@ -133,7 +133,7 @@ def cas_to_pyscf(h1, eri, ecore, num_alpha, num_beta):
         ecore (float) - frozen core electronic energy + nuclear repulsion energy
         num_alpha (int) - number of spin up electrons in CAS space
         num_beta (int) - number of spin down electrons in CAS space
-    
+
     Returns:
         pyscf_mol: PySCF molecule object
         pyscf_mf:  PySCF mean field object
@@ -334,7 +334,7 @@ def save_pyscf_to_casfile(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
 def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True) -> Tuple[float, float, float]:
-    """ Compute CCSD(T) energy using rank-reduced ERIs 
+    """ Compute CCSD(T) energy using rank-reduced ERIs
 
     Args:
         pyscf_mf - PySCF mean field object
@@ -425,16 +425,17 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     mf.mo_energy = w
 
     # Rotate the interaction tensors into the canonical basis.
-    # Reiher and Li tensors, for example, are read-in in the local MO basis, which is not 
-    # optimal for the CCSD(T) calculation (canonical gives better energy estimate whereas QPE is 
+    # Reiher and Li tensors, for example, are read-in in the local MO basis, which is not
+    # optimal for the CCSD(T) calculation (canonical gives better energy estimate whereas QPE is
     # invariant to choice of basis)
     if use_kernel: 
-        mf.conv_tol = 1e-9
+        mf.conv_tol = 1e-8
         mf.init_guess = '1e'
         mf.verbose=4
         mf.diis_space = 24
-        mf.level_shift = 0.25
-        mf.max_cycle = 500 
+        mf.level_shift = 0.5
+        mf.conv_check = False
+        mf.max_cycle = 800
         mf.kernel()
         mf = stability(mf)
         mf = stability(mf)
@@ -443,16 +444,16 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         try:
             assert np.isclose(scf_energy, mf.e_tot,rtol=1e-14)
         except AssertionError:
-            print("WARNING: SCF energy from input integrals does not match SCF energy from mf.kernel()")
+            print("WARNING: E(SCF) from input integrals does not match E(SCF) from mf.kernel()")
             print("  Will use E(SCF) = {:12.6f} from mf.kernel going forward.".format(mf.e_tot))
         print("E(SCF, ints) = {:12.6f} whereas E(SCF) = {:12.6f}".format(scf_energy,mf.e_tot))
 
-        # New SCF energy and orbitals for CCSD(T), so set scf_energy to new SCF value 
+        # New SCF energy and orbitals for CCSD(T), so set scf_energy to new SCF value
         scf_energy = mf.e_tot
 
 
     # Now re-set the eri's to the (possibly rank-reduced) ERIs
-    mf._eri = eri 
+    mf._eri = eri
     mf.mol.incore_anyway = True
 
     mycc = cc.CCSD(mf)
