@@ -14,3 +14,4 @@
 
 from .compute_lambda_sf import compute_lambda
 from .costing_sf import compute_cost
+from .single_factorization import single_factorization

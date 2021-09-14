@@ -14,3 +14,4 @@
 
 from .compute_lambda_df import compute_lambda
 from .costing_df import compute_cost
+from .double_factorization import double_factorization
