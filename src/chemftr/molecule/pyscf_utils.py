@@ -433,7 +433,6 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         mf.init_guess = '1e'
         mf.verbose=4
         mf.diis_space = 24
-        mf.diis_start_cycle = 4
         mf.level_shift = 0.25
         mf.max_cycle = 500 
         mf.kernel()
@@ -461,7 +460,6 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     mycc.conv_tol = 1E-8
     mycc.conv_tol_normt = 1E-4
     mycc.diis_space = 24
-    mycc.diis_start_cycle = 4
     mycc.verbose = 4
     mycc.kernel()
 
