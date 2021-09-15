@@ -86,7 +86,7 @@ def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
         truncation = normSC * np.abs(e)
 
         idx = truncation > thresh
-        plus  = np.sum(idx)
+        plus = np.sum(idx)
         M += plus
 
         if plus == 0:

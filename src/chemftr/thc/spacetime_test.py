@@ -28,10 +28,11 @@ def test_qubit_vs_toffoli_original_strategy():
                           623,607,591,575,559,543,527,511,495,479,463,447,431,415,399,383,367,351,\
                           335,319,303,287,271,262,241,242,241,251,475,285,230,224,193])
 
-    tof, qub, cols = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='full', verbose=False)
+    tgates, qubits, labels, colors = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, \
+                                                      algorithm='full', verbose=False)
 
-    assert np.allclose(tof.astype(int), ref_tof)
-    assert np.allclose(qub.astype(int), ref_qub)
+    assert np.allclose(tgates.astype(int), ref_tof)
+    assert np.allclose(qubits.astype(int), ref_qub)
 
 def test_qubit_vs_toffoli_improved_strategy():
     lam = 307.68
@@ -53,8 +54,9 @@ def test_qubit_vs_toffoli_improved_strategy():
                            621,605,589,573,557,541,525,509,493,477,461,445,429,413,397,381,365,349,\
                            333,317,301,285,269,253,244,223,224,223,233,457,267,212,225,175])
 
-    tof, qub, cols = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=False)
+    tgates, qubits, labels, colors = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, \
+                                                      algorithm='half', verbose=False)
 
-    assert np.allclose(tof.astype(int), ref2_tof)
-    assert np.allclose(qub.astype(int), ref2_qub)
+    assert np.allclose(tgates.astype(int), ref2_tof)
+    assert np.allclose(qubits.astype(int), ref2_qub)
 

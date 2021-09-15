@@ -1,9 +1,9 @@
 """Compute qubit vs toffoli for THC LCU"""
+from math import pi
 import numpy as np
+import itertools
 import matplotlib.pyplot as plt
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
-
-from math import pi
 
 from chemftr.util import QR, QI
 
@@ -21,11 +21,12 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=Fa
         algorithm (str) - 'half', where half of the phasing angles are loaded at a time
                           'full', where angles loaded from QROM to perform phasing operations are
                                   all loaded at the same time
-                          Note: In 'Even more efficient quantum...' paper (arXiv:2011.03494), 
+                          Note: In 'Even more efficient quantum...' paper (arXiv:2011.03494),
                               'half' corresponds to Fig 11, while 'full' corresponds to Fig 12.
         verbose (bool) - do additional printing of intermediates?
 
     """
+    # only valid algorithms accepted
     assert algorithm in ['half', 'full']
 
     # (*The number of iterations for the phase estimation.*)
@@ -38,13 +39,13 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=Fa
     # (*The number of bits used for the contiguous register.*)
     nc=np.ceil(np.log2(d))
     # (*The output size is 2*Log[M] for the alt values, χ for the keep value, and 2 for the two sign bits.*)
-    m=2*nM+2+chi 
-    
+    m=2*nM+2+chi
+
     # QR[L_,M_]:= np.ceil(MinValue[{L/2^k+M*(2^k-1),k>=0},k∈Integers]] (*This gives the minimum cost for a QROM over L values of size M.*)
     # QRa[L_,M_]:=ArgMin[{L/2^k+M*(2^k-1),k>=0},k∈Integers] (*Gives the optimal k.*)
     # QI[L_]:= np.ceil(MinValue[{L/2^k+2^k,k>=0},k∈Integers]] (*This gives the minimum cost for an inverse QROM over L values.*)
     # QIa[L_]:= np.ceil(ArgMin[{L/2^k+2^k,k>=0},k∈Integers]] (*This gives the minimum cost for an inverse QROM over L values.*)
-    
+
     # (*The next block of code finds the optimal number of bits to use for the rotation angle for the amplitude a
     # mplification taking into account the probability of failure and the cost of the rotations.*)
     oh = np.zeros(20, dtype=float)
@@ -257,63 +258,158 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=Fa
     qu27 = perm  # (*Iterate the control register.*)
     tof27 = 1
 
-    # Color codes
-    sm = '#435CE8'  # small elements
-    pq = '#E83935'  # preparation QROM
-    rq = '#F59236'  # rotations QROM
-    ri = '#E3D246'  # R^\dag
-    ro = '#36B83E'  # R 
+    # Labels
+    sm = 'small element'
+    pq = 'preparation QROM'
+    rq = 'rotation QROM'
+    ri = 'R$^{\dag}$'
+    ro = 'R'
+    iq = 'inverse QROM'
+
+    color_dict = {sm: '#435CE8',pq:'#E83935',rq:'#F59236', ri:'#E3D246', ro:'#36B83E',iq:'#E83935'}
 
     if algorithm == 'half':
-        qu = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9, qu8, qu9, qu9, qu8]),
-                        qu10,
-                        np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu14, qu15, qu16, qu15, qu14]),
-                        qu17,
-                        np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
-        tof = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9, tof8, tof9, tof9, tof8]),
-                        tof10,
-                        np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof14, tof15, tof16, tof15, tof14]),
-                        tof17,
-                        np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
-        cols = [sm, sm, pq, sm, sm, sm, sm, rq, ri, rq, ri, ro, rq] + \
-               [ro] * len(qu10) + \
-               [rq, sm, sm, sm, rq, ri, rq, ri, sm, ro, rq] + \
-               [ro] * len(qu17) + \
-               [rq, sm, sm, sm, sm, pq, sm, sm, sm, sm]
+        tgates = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9, tof8, tof9, tof9, tof8]),
+                            tof10,
+                            np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof14, tof15, tof16, tof15, tof14]),
+                            tof17,
+                            np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
+        qubits = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9, qu8, qu9, qu9, qu8]),
+                            qu10,
+                            np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu14, qu15, qu16, qu15, qu14]),
+                            qu17,
+                            np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
+        labels = [sm, sm, pq, sm, sm, sm, sm, rq, ri, rq, ri, ro, rq] + \
+                 [ro] * len(qu10) + \
+                 [rq, sm, sm, sm, rq, ri, rq, ri, sm, ro, rq] + \
+                 [ro] * len(qu17) + \
+                 [rq, sm, sm, sm, sm, iq, sm, sm, sm, sm]
+
+        colors = [color_dict[i] for i in labels]
     elif algorithm == 'full':
-        qu = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9]),
-                        qu10,
-                        np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu16]),
-                        qu17,
-                        np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
-        tof = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9]),
+        tgates = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9]),
                         tof10,
                         np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof16]),
                         tof17,
                         np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
-        cols = [sm, sm, pq, sm, sm, sm, sm, rq, ri] + \
-               [ro] * len(qu10) + \
-               [rq, sm, sm, sm, rq, ri, sm] + \
-               [ro] * len(qu17) + \
-               [rq, sm, sm, sm, sm, pq, sm, sm, sm, sm]
+        qubits = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9]),
+                        qu10,
+                        np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu16]),
+                        qu17,
+                        np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
+        labels = [sm, sm, pq, sm, sm, sm, sm, rq, ri] + \
+                 [ro] * len(qu10) + \
+                 [rq, sm, sm, sm, rq, ri, sm] + \
+                 [ro] * len(qu17) + \
+                 [rq, sm, sm, sm, sm, iq, sm, sm, sm, sm]
 
-    return tof, qu, cols 
+        colors = [color_dict[i] for i in labels]
 
-def plot_qubit_vs_toffoli(tof, qub, cols):
-    """ Helper function to plot qubit vs toffoli similar to Figs 11 and 12 from the 
-        'Even more efficient quantum...' paper (arXiv:2011.03494), 
+    # check lists are at least consistent
+    assert all(len(element) == len(tgates) for element in [qubits, labels, colors])
+
+    return tgates, qubits, labels, colors
+
+def plot_qubit_vs_toffoli(tgates, qubits, labels, colors, tgate_label_thresh=100):
+    """ Helper function to plot qubit vs toffoli similar to Figs 11 and 12 from the
+        'Even more efficient quantum...' paper (arXiv:2011.03494),
 
     Args:
-        tof (list or 1D vector) - list of toffoli values
-        qub (list or 1D vector) - list of qubit values
-        cols (list) - list of colors corresponding to different steps of algorithm 
+        tgates (list or 1D vector) - list of toffoli values
+        qubits (list or 1D vector) - list of qubit values
+        labels (list) - list of labels corresponding to different steps of algorithm
+        colors (list) - list of colors corresponding to different steps of algorithm
+        tgate_label_thresh - don't label steps "thinner" than threshold number of Toffolis
     """
     # To align the bars on the right edge pass a negative width and align='edge'.
-    plt.bar(np.cumsum(tof), qub, width=-tof,align='edge',color=cols)
-    plt.bar(0, qub[-1], width=sum(tof), align='edge', color='#D7C4F2')
+    ax = plt.gca()
+    plt.bar(np.cumsum(tgates), qubits, width=-tgates,align='edge',color=colors)
+    plt.bar(0, qubits[-1], width=sum(tgates), align='edge', color='#D7C4F2')
     plt.xlabel('Toffoli count')
     plt.ylabel('Number of qubits')
+
+    # Now add the labels
+    # First, group labels and neighboring tgates
+    labels_grouped, tgates_grouped, qubits_grouped = group_steps(labels, tgates, qubits)
+    for step, label in enumerate(labels_grouped):
+        if 'small' in label:
+            # skip the steps identified as 'small'
+            continue
+        elif tgates_grouped[step] < tgate_label_thresh:
+            # otherwise skip really narrow steps
+            continue
+        else:
+            x = np.cumsum(tgates_grouped)[step] - (tgates_grouped[step]*0.5)
+            y = 0.5 * (qubits_grouped[step] - qubits[-1]) + qubits[-1]
+            ax.text(x, y, label, rotation='vertical', va='center', ha='center',fontsize='x-small')
+
+    # Finally add system and control qubit label
+    ax.text(0.5*np.sum(tgates), 0.5*qubits[-1], "System and control qubits", \
+            va='center', ha='center',fontsize='x-small')
+
     plt.show()
+
+def table_qubit_vs_toffoli(tgates, qubits, labels, colors):
+    """ Helper function to generate qubit vs toffoli table .. text version of Fig 11 and Fig 12 in
+        'Even more efficient quantum...' paper (arXiv:2011.03494),
+
+    Args:
+        tgates (list or 1D vector) - list of toffoli values
+        qubits (list or 1D vector) - list of qubit values
+        labels (list) - list of labels corresponding to different steps of algorithm
+        colors (list) - list of colors corresponding to different steps of algorithm
+    """
+
+    print("=" * 60)
+    print("{:>8s}{:>11s}{:>9s}{:>20s}{:>12s}".format('STEP','TOFFOLI','QUBIT*','LABEL','COLOR'))
+    print("-" * 60)
+    for step in range(len(tgates)):
+        print('{:8d}{:11d}{:9d}{:>20s}{:>12s}'.format(step, int(tgates[step]), int(qubits[step]), labels[step], colors[step]))
+    print("=" * 60)
+    print("  *Includes {:d} system and control qubits".format(int(qubits[-1])))
+
+def group_steps(labels,tgates,qubits):
+    """ Group similar adjacent steps by label. In addition to the grouped labels, also  returning 
+        the total Toffoli count and average qubits allocated for that grouping. 
+        Useful for collecting similar steps in the spacetime plots.
+
+        Example:
+          Input:
+            labels = ['R', 'R', 'QROM', 'QROM, 'I-QROM', 'QROM', 'QROM', 'R']
+            tgates = [  5,   8,     20,    10,       14,     30,     10,  20]
+            qubits = [ 10,  10,     40,    20,        4,     80,     60,  60]
+
+          Output:
+            grouped_labels = ['R', 'QROM', 'I-QROM', 'QROM', 'R']
+            grouped_tgates = [ 13,     30,       14,     40,  20]  (sum)
+            grouped_qubits = [ 10,     30,        4,     70,  60]  (mean)
+
+    """
+    assert len(labels) == len(tgates)
+    assert len(labels) == len(qubits)
+
+    # Key function -- group identical nearest neighbors in labels (x[0])
+    key_func = lambda x: x[0]
+
+    # create grouped labels and tgates first
+    grouped_labels = []
+    grouped_tgates = []
+    L = zip(labels, tgates)
+    for label, group in itertools.groupby(L, key_func):
+        grouped_labels.append(label)
+        grouped_tgates.append(np.sum([i[1] for i in group]))
+
+    # now do the grouped qubits
+    # somehow doing multiple list comprehensions on the group breaks the grouping? 
+    # so we have to do this in a separate loop.
+    grouped_qubits = []
+    L = zip(labels, qubits)
+    for label, group in itertools.groupby(L, key_func):
+        grouped_qubits.append(np.mean([i[1] for i in group]))
+
+    # sanity check -- shouldn't be losing total value in toffoli 
+    assert np.sum(tgates) == np.sum(grouped_tgates)
+    return grouped_labels, grouped_tgates, grouped_qubits 
 
 
 if __name__ == "__main__":
@@ -325,7 +421,8 @@ if __name__ == "__main__":
     beta = 16
     M = 350
 
-    tof, qub, cols = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False)
-    plot_qubit_vs_toffoli(tof, qub, cols)
+    tgates, qubits, labels, colors = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half',verbose=False)
+    table_qubit_vs_toffoli(tgates, qubits, labels, colors)
+    plot_qubit_vs_toffoli(tgates, qubits, labels, colors)
 
      
