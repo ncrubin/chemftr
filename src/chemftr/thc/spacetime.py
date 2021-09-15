@@ -1,5 +1,6 @@
 """Compute qubit vs toffoli for THC LCU"""
 import numpy as np
+import matplotlib.pyplot as plt
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
 from math import pi
@@ -7,7 +8,7 @@ from math import pi
 from chemftr.util import QR, QI
 
 
-def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
+def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=False):
     """
     Args:
         lam (float) - the lambda-value for the Hamiltonian
@@ -17,14 +18,22 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
         chi (int) - number of bits of precision for state prep
         beta (int) - number of bits of precision for rotations
         M (int) - THC rank or r_{Thc}
+        algorithm (str) - 'half', where half of the phasing angles are loaded at a time
+                          'full', where angles loaded from QROM to perform phasing operations are
+                                  all loaded at the same time
+                          Note: In 'Even more efficient quantum...' paper (arXiv:2011.03494), 
+                              'half' corresponds to Fig 11, while 'full' corresponds to Fig 12.
         verbose (bool) - do additional printing of intermediates?
 
     """
+    assert algorithm in ['half', 'full']
+
     # (*The number of iterations for the phase estimation.*)
     iters = np.ceil(pi * lam / (dE * 2))
     # (*The number of bits used for each register.*)
     nM = np.ceil(np.log2(M + 1))
     # (*This is the number of distinct items of data we need to output, see Eq. (28).*)
+
     d = M * (M + 1) / 2 + n / 2
     # (*The number of bits used for the contiguous register.*)
     nc=np.ceil(np.log2(d))
@@ -96,8 +105,13 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
         print("Actual ancilla ... ", np.max([aca+ac10,aca+acc]))  # (*This is the actual ancilla cost if we need more ancillas in between.*)
         print("Spacetime volume ", np.max([aca+ac10,aca+acc])*cost)  # (*Spacetime volume.*)
 
+    #TODO: Clean up and re-organize the logic a bit ... this is more or less a direct port from Mathematica
+
     # (*First are the numbers of qubits that must be kept throughout the computation. See page 18.*)
-    ac1 = 2 * np.ceil(np.log2(iters + 1)) - 1  # (*The qubits used as the control registers for the phase estimation, that must be kept the whole way through. If we used independent controls each time that would increase the Toffoli cost by  np.ceil(np.log2iters+1]]-3, while saving  np.ceil(np.log2iters+1]]-1 qubits.*)
+    if algorithm == 'half':
+        ac1 = np.ceil(np.log2(iters + 1))  # (*The qubits used as the control registers for the phase estimation, that must be kept the whole way through. If we used independent controls each time that would increase the Toffoli cost by  np.ceil(np.log2iters+1]]-3, while saving  np.ceil(np.log2iters+1]]-1 qubits.*)
+    elif algorithm == 'full':
+        ac1 = 2 * np.ceil(np.log2(iters + 1)) - 1  # (*The qubits used as the control registers for the phase estimation, that must be kept the whole way through. If we used independent controls each time that would increase the Toffoli cost by  np.ceil(np.log2iters+1]]-3, while saving  np.ceil(np.log2iters+1]]-1 qubits.*)
     ac2 = n  # (*The system qubits that must always be included.*)
     ac3 = 2 * nM  # (*The μ and ν registers, that must be kept because they are control registers that aren't fully erased and must be reflected on.*)
     ac4512 = 4  # (*These are the qubits for the spin in the control state as well as the qubit that is rotated for the preparation of the equal superposition state, AND the qubit that is used to control . None of these are fully inversely prepared.*)
@@ -116,7 +130,10 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
     tof2 = nM**2 + nM - 1  # (*The Toffoli cost of computing the contiguous register.*)
     perm = perm + nc  # (*The running number of qubits is increased by the number needed for the contiguous register.*)
 
-    kt = 32  # (*Here I'm setting the k-value for the QROM by hand instead of choosing the optimal one for Toffolis.*)
+    if algorithm == 'half':
+        kt = 16  # (*Here I'm setting the k-value for the QROM by hand instead of choosing the optimal one for Toffolis.*)
+    elif algorithm == 'full':
+        kt = 32  # (*Here I'm setting the k-value for the QROM by hand instead of choosing the optimal one for Toffolis.*)
     qu3 = perm + m * kt + np.ceil(np.log2(d / kt))  # (*This is the number of qubits needed during the QROM.*)
     tof3 = np.ceil(d / kt) + m * (kt - 1)  # (*The number of Toffolis for the QROM.*)
     perm = perm + m  # (*The number of ancillas used increases by the actual output size of the QROM.*)
@@ -134,16 +151,30 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
     qu7 = perm  # (*Swapping based on the spin register.*)
     tof7 = n / 2
 
-    qu8 = perm + nM + beta * n / 2  # (*We use these temporary ancillas for the first QROM for the rotation angles.*)
+    if algorithm == 'half':
+        qu8 = perm + nM + beta * n / 4  # (*We use these temporary ancillas for the first QROM for the rotation angles.*)
+    elif algorithm == 'full':
+        qu8 = perm + nM + beta * n / 2  # (*We use these temporary ancillas for the first QROM for the rotation angles.*)
     tof8 = M + n / 2 - 2  # (*The cost of outputting the rotation angles including those for the one-electron part.*)
-    perm = perm + beta * n / 2  # (*We are now need the output rotation angles, though we don't need the temporary qubits from the unary iteration.*)
+
+    if algorithm == 'half':
+        perm = perm + beta * n / 4  # (*We are now need the output rotation angles, though we don't need the temporary qubits from the unary iteration.*)
+    elif algorithm == 'full':
+        perm = perm + beta * n / 2  # (*We are now need the output rotation angles, though we don't need the temporary qubits from the unary iteration.*)
 
     qu9 = perm + (beta - 2)  # (*We need a few temporary registers for adding into the phase gradient register.*)
-    tof9 = n * (beta - 2)  # (*The cost of the rotations.*)
 
-    qu10 = np.array([-j * beta for j in range(int(n / 2))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/2-1}]+perm+(beta-2) # (*Make a list where we keep subtracting the data qubits that can be erased.*)
-    tof10 = np.array([2 * (beta - 2) for j in range(int(n / 2))])  # Table[2*(beta-2),{j,0,n/2-1}]  # (*The cost of the rotations.*)
-    perm = perm - beta * n / 2  # (*We've erased the data.*)
+    if algorithm == 'half':
+        tof9 = n * (beta - 2) / 2 # (*The cost of the rotations.*)
+        qu10 = np.array([-j * beta for j in range(int(n / 4))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/4-1}]+perm+(beta-2) # (*Make a list where we keep subtracting the data qubits that can be erased.*)
+        tof10 = np.array([2 * (beta - 2) for j in range(int(n / 4))])  # Table[2*(beta-2),{j,0,n/4-1}]  # (*The cost of the rotations.*)
+        perm = perm - beta * n / 4  # (*We've erased the data.*)
+    elif algorithm == 'full':
+        tof9 = n * (beta - 2)  # (*The cost of the rotations.*)
+        qu10 = np.array([-j * beta for j in range(int(n / 2))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/2-1}]+perm+(beta-2) # (*Make a list where we keep subtracting the data qubits that can be erased.*)
+        tof10 = np.array([2 * (beta - 2) for j in range(int(n / 2))])  # Table[2*(beta-2),{j,0,n/2-1}]  # (*The cost of the rotations.*)
+        perm = perm - beta * n / 2  # (*We've erased the data.*)
+
 
     k1 = 2 ** QI(M + n / 2)[0]  # (*Find the k for the phase fixup for the erasure of the rotations.*)
     qu11 = perm + k1 + np.ceil(np.log2(M / k1))  # (*The temporary qubits used. The data qubits were already erased, so don't change perm.*)
@@ -158,19 +189,32 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
     qu13 = perm  # (*Swapping based on the spin register.*)
     tof13 = n / 2
 
-    qu14 = perm + nM - 1 + beta * n / 2  # (*We use these temporary ancillas for the second QROM for the rotation angles.*)
+    if algorithm == 'half':
+        qu14 = perm + nM - 1 + beta * n / 4  # (*We use these temporary ancillas for the second QROM for the rotation angles.*)
+        perm = perm + beta * n / 4
+    elif algorithm == 'full':
+        qu14 = perm + nM - 1 + beta * n / 2  # (*We use these temporary ancillas for the second QROM for the rotation angles.*)
+        perm = perm + beta * n / 2
     tof14 = M - 2
-    perm = perm + beta * n / 2
 
     qu15 = perm + (beta - 2)  # (*We need a few temporary registers for adding into the phase gradient register.*)
-    tof15 = n * (beta - 2)  # (*The cost of the rotations.*)
+
+    if algorithm == 'half':
+        tof15 = n * (beta - 2) / 2  # (*The cost of the rotations.*)
+    elif algorithm == 'full':
+        tof15 = n * (beta - 2)  # (*The cost of the rotations.*)
 
     qu16 = perm  # (*Just one Toffoli to do the controlled Z1.*)
     tof16 = 1
 
-    qu17 = np.array([-j * beta for j in range(int(n / 2))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/2-1}]+perm+(beta-2)  # (*Make a list where we keep subtracting the data qubits that can be erased.*)
-    tof17 = np.array([2 * (beta - 2) for j in range(int(n / 2))])  # Table[2*(beat-2),{j,0,n/2-1}]  # (*The cost of the rotations.*)
-    perm = perm - beta * n / 2  # (*We've erased the data.*)
+    if algorithm == 'half':
+        qu17 = np.array([-j * beta for j in range(int(n / 4))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/4-1}]+perm+(beta-2)  # (*Make a list where we keep subtracting the data qubits that can be erased.*)
+        tof17 = np.array([2 * (beta - 2) for j in range(int(n / 4))])  # Table[2*(beta-2),{j,0,n/4-1}]  # (*The cost of the rotations.*)
+        perm = perm - beta * n / 4  # (*We've erased the data.*)
+    elif algorithm == 'full':
+        qu17 = np.array([-j * beta for j in range(int(n / 2))]) + perm + beta - 2  # Table[-j*beta,{j,0,n/2-1}]+perm+(beta-2)  # (*Make a list where we keep subtracting the data qubits that can be erased.*)
+        tof17 = np.array([2 * (beta - 2) for j in range(int(n / 2))])  # Table[2*(beat-2),{j,0,n/2-1}]  # (*The cost of the rotations.*)
+        perm = perm - beta * n / 2  # (*We've erased the data.*)
 
     k1 = 2 ** QI(M)[0]  # (*Find the k for the phase fixup for the erasure of the rotations.*)
     qu18 = perm + k1 + np.ceil(np.log2(M / k1))  # (*The temporary qubits used. The data qubits were already erased, so don't change perm.*)
@@ -202,29 +246,75 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False):
     tof25 = 10 * nM + 2 * br - 9  # (*This is the number of Toffolis during this step.*)
     perm = perm - 2  # (*This is increasing the running number of permanent ancillas by 2 for the ν=M+1 flag qubit and the success flag qubit.*)
 
-    qu26 = perm + costref  # (*We need some ancillas to perform a reflection on multiple qubits. We are including one more Toffoli to make it controlled.*)
-    tof26 = costref
+    if algorithm == 'half':
+        qu26 = perm + costref + np.ceil(np.log2(iters + 1)) # (*We need some ancillas to perform a reflection on multiple qubits. We are including one more Toffoli to make it controlled.*)
+        tof26 = costref + np.ceil(np.log2(iters + 1))
+    elif algorithm == 'full':
+        qu26 = perm + costref  # (*We need some ancillas to perform a reflection on multiple qubits. We are including one more Toffoli to make it controlled.*)
+        tof26 = costref
 
+    # FIXME: are qu27 and tof27 present in the improved algorithm?
     qu27 = perm  # (*Iterate the control register.*)
     tof27 = 1
 
-    qu = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9]),
-                    qu10,
-                    np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu16]),
-                    qu17,
-                    np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
-    tof = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9]),
-                    tof10,
-                    np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof16]),
-                    tof17,
-                    np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
-    # cols = np.hstack(([sm, sm, pq, sm, sm, sm, sm, rq, ri]),
-    #                    Table[ro, Length[qu10]],
-    #                     np.array([rq, sm, sm, sm, rq, ri, sm]),
-    #                     Table[ro, Length[qu17]],
-    #                  np.array([rq, sm, sm, sm, sm, pq, sm, sm, sm, sm]))
+    # Color codes
+    sm = '#435CE8'  # small elements
+    pq = '#E83935'  # preparation QROM
+    rq = '#F59236'  # rotations QROM
+    ri = '#E3D246'  # R^\dag
+    ro = '#36B83E'  # R 
 
-    # NOTE: NOW WE NEED TO PLOT OR GENERATE AN OBJECT TO PLOT. TALK TO DOMINC ABOUT WHAT IS GOING ON IN THE PLOT
+    if algorithm == 'half':
+        qu = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9, qu8, qu9, qu9, qu8]),
+                        qu10,
+                        np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu14, qu15, qu16, qu15, qu14]),
+                        qu17,
+                        np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
+        tof = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9, tof8, tof9, tof9, tof8]),
+                        tof10,
+                        np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof14, tof15, tof16, tof15, tof14]),
+                        tof17,
+                        np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
+        cols = [sm, sm, pq, sm, sm, sm, sm, rq, ri, rq, ri, ro, rq] + \
+               [ro] * len(qu10) + \
+               [rq, sm, sm, sm, rq, ri, rq, ri, sm, ro, rq] + \
+               [ro] * len(qu17) + \
+               [rq, sm, sm, sm, sm, pq, sm, sm, sm, sm]
+    elif algorithm == 'full':
+        qu = np.hstack((np.array([qu1, qu2, qu3, qu4, qu5, qu6, qu7, qu8, qu9]),
+                        qu10,
+                        np.array([qu11, qu12, qu12a, qu13, qu14, qu15, qu16]),
+                        qu17,
+                        np.array([qu18, qu19, qu20, qu21, qu22, qu23, qu24, qu25, qu26, qu27])))
+        tof = np.hstack((np.array([tof1, tof2, tof3, tof4, tof5, tof6, tof7, tof8, tof9]),
+                        tof10,
+                        np.array([tof11, tof12, tof12a, tof13, tof14, tof15, tof16]),
+                        tof17,
+                        np.array([tof18, tof19, tof20, tof21, tof22, tof23, tof24, tof25, tof26, tof27])))
+        cols = [sm, sm, pq, sm, sm, sm, sm, rq, ri] + \
+               [ro] * len(qu10) + \
+               [rq, sm, sm, sm, rq, ri, sm] + \
+               [ro] * len(qu17) + \
+               [rq, sm, sm, sm, sm, pq, sm, sm, sm, sm]
+
+    return tof, qu, cols 
+
+def plot_qubit_vs_toffoli(tof, qub, cols):
+    """ Helper function to plot qubit vs toffoli similar to Figs 11 and 12 from the 
+        'Even more efficient quantum...' paper (arXiv:2011.03494), 
+
+    Args:
+        tof (list or 1D vector) - list of toffoli values
+        qub (list or 1D vector) - list of qubit values
+        cols (list) - list of colors corresponding to different steps of algorithm 
+    """
+    # To align the bars on the right edge pass a negative width and align='edge'.
+    plt.bar(np.cumsum(tof), qub, width=-tof,align='edge',color=cols)
+    plt.bar(0, qub[-1], width=sum(tof), align='edge', color='#D7C4F2')
+    plt.xlabel('Toffoli count')
+    plt.ylabel('Number of qubits')
+    plt.show()
+
 
 if __name__ == "__main__":
     lam = 307.68
@@ -234,4 +324,8 @@ if __name__ == "__main__":
     chi = 10
     beta = 16
     M = 350
-    qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False)
+
+    tof, qub, cols = qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, verbose=False)
+    plot_qubit_vs_toffoli(tof, qub, cols)
+
+     
