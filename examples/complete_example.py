@@ -1,19 +1,35 @@
-from chemftr.avas import AVAS
+""" Do the costing estimated for a water molecule """
 
-# AVAS class is a manager for the pipeline. Most functions utilize saved intermediates, so feel free
-# to comment out routines already run. If a function doesn't have enough information, it won't work!
+from pyscf import gto, scf
+from chemftr.molecule import stability, localize, avas_active_space
+from chemftr.sf import single_factorization
+from chemftr.df import double_factorization
 
-# This is a very small example, so kind of finicky with thresholds and rank-reductions
-chem = AVAS('Fe 0.0 0.0 0.0',charge=3,multiplicity=2,basis='ccpvdz')  # Fe(III) low-spin 
-chem.do_scf()
-chem.localize(loc_type='pm')
-#print(chem.mf.mol.ao_labels())  # see labels of the AO basis to choose from
+# input is just like any other PySCF script
+mol = gto.M(
+    atom = '''O    0.000000      -0.075791844    0.000000
+              H    0.866811829    0.601435779    0.000000
+              H   -0.866811829    0.601435779    0.000000
+           ''',
+    basis = 'ccpvtz',
+    symmetry = False,
+    charge = 1,
+    spin = 1
+)
+mf = scf.ROHF(mol)
+mf.verbose = 4
+mf.kernel()
 
-# use larger basis for minao to select non-valence...here select 4d as well for double-shell effect
-chem.do_avas(ao_list=['Fe 3d', 'Fe 4d'],minao='ccpvdz') 
+# make sure wave function is stable before we proceed
+mf = stability(mf)
+
+# localize before automatically selecting active space with AVAS
+mf = localize(mf, loc_type='pm')  # default is loc_type ='pm' (Pipek-Mezey)
+# you can use larger basis for `minao` to select non-valence...here select O 3s and 3p as well 
+mol, mf = avas_active_space(mf, ao_list=['H 1s', 'O 2s', 'O 2p', 'O 3s', 'O 3p'], minao='ccpvtz') 
 
 # make pretty SF costing table
-chem.do_single_factorization(rank_range=[20,25,30,35,40,45,50])
+single_factorization(mf, name='water', rank_range=[20,25,30,35,40,45,50])
 
 # make pretty DF costing table
-chem.do_double_factorization(thresh_range=[4e-3,3e-3,2e-3,1e-3,9e-4,8e-4,7e-4])
+double_factorization(mf, name='water', thresh_range=[1e-2,5e-3,1e-3,5e-4,1e-4,5e-5,1e-5]) 

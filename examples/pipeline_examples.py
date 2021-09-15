@@ -21,6 +21,7 @@ Expected output:
 import os
 import numpy as np
 from chemftr import sf, df
+from chemftr.molecule import load_casfile_to_pyscf
 
 """ Global defaults from paper """
 DE = 0.001  # max allowable phase error
@@ -32,7 +33,8 @@ if os.path.isfile(REIHER_INTS):
 
     """ Single factorization on Reiher FeMoco """
     RANK = 200
-    n_orb, lam = sf.compute_lambda(cholesky_dim=RANK, integral_path=REIHER_INTS)
+    mol, mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
+    n_orb, lam, _ = sf.compute_lambda(mf, cholesky_dim=RANK)
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
@@ -48,7 +50,7 @@ if os.path.isfile(REIHER_INTS):
     """ Double factorization on Reiher FeMoco """
     BETA = 16
     THRESH = 0.00125
-    n_orb, lam, rank, num_eigen = df.compute_lambda(thresh=THRESH, integral_path=REIHER_INTS)
+    n_orb, lam, rank, num_eigen, _ = df.compute_lambda(mf, thresh=THRESH)
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
@@ -65,7 +67,8 @@ if os.path.isfile(LI_INTS):
 
     """ Single factorization on Li FeMoco """
     RANK = 275
-    n_orb, lam = sf.compute_lambda(cholesky_dim=RANK, integral_path=LI_INTS)
+    mol, mf = load_casfile_to_pyscf(LI_INTS,num_alpha = 27, num_beta = 27)
+    n_orb, lam, _ = sf.compute_lambda(mf, cholesky_dim=RANK)
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
@@ -81,7 +84,7 @@ if os.path.isfile(LI_INTS):
     """ Double factorization on li FeMoco """
     BETA = 20
     THRESH = 0.00125
-    n_orb, lam, rank, num_eigen = df.compute_lambda(thresh=THRESH, integral_path=LI_INTS)
+    n_orb, lam, rank, num_eigen, _ = df.compute_lambda(mf, thresh=THRESH)
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
