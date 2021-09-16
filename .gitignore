@@ -122,3 +122,7 @@ dmypy.json
 
 # ignore vim swap files
 *.swp
+
+# ignore generated .txt files and .molden files
+*.txt
+*.molden

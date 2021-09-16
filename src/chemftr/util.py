@@ -148,3 +148,29 @@ class RunSilent(object):
         sys.stdout = self.old_stdout
         sys.stderr = self.old_stderr
         self.devnull.close()
+
+def eigendecomp(M, tol=1.15E-16):
+    """ Decompose matrix M into L.L^T where rank(L) < rank(M) to some threshold
+
+    Args:
+       M (np.ndarray) - (N x N) positive semi-definite matrix to be decomposed
+       tol (float) - eigenpairs with eigenvalue above tol will be kept
+
+    Returns:
+       L (np.ndarray) - (K x N) array such that K <= N and L.L^T = M
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(M)
+
+    # Put in descending order
+    eigenvalues = eigenvalues[::-1]
+    eigenvectors = eigenvectors[:,::-1]
+
+    # Truncate
+    idx = np.where(eigenvalues > tol)[0]
+    eigenvalues, eigenvectors = eigenvalues[idx], eigenvectors[:,idx]
+
+    # eliminate eigenvalues from eigendecomposition
+    L = np.einsum("ij,j->ij",eigenvectors,
+        np.sqrt(eigenvalues))
+
+    return L

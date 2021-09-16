@@ -5,7 +5,7 @@ from chemftr import df
 from chemftr.molecule import rank_reduced_ccsd_t
 
 
-def double_factorization(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001,chi=10,beta=20):
+def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001,chi=10,beta=20):
     """ Print a table to file for testing how various DF thresholds impact cost, accuracy, etc.
 
     Args:
@@ -37,9 +37,9 @@ def double_factorization(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001
     
     cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
                                                                                                          
-    # Reference calculation (dim = None is full cholesky / exact ERIs)                                   
+    # Reference calculation (eri_rr= None is full rank / exact ERIs)                                   
     escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None)
-                                                                                                         
+
     exact_ecor = ecor
     exact_etot = etot
 

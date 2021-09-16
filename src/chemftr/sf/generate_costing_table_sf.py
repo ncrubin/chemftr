@@ -5,7 +5,7 @@ from chemftr import sf
 from chemftr.molecule import rank_reduced_ccsd_t
 
 
-def single_factorization(pyscf_mf,name='molecule',rank_range=range(50,401,25),chi=10,dE=0.001):
+def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),chi=10,dE=0.001):
     """ Print a table to file for testing how various SF ranks impact cost, accuracy, etc.
 
     Args:
@@ -35,7 +35,7 @@ def single_factorization(pyscf_mf,name='molecule',rank_range=range(50,401,25),ch
 
     cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
 
-    # Reference calculation (eri_rr = None is full cholesky / exact ERIs)
+    # Reference calculation (eri_rr = None is full rank / exact ERIs)
     escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None)
 
     exact_ecor = ecor
@@ -55,7 +55,7 @@ def single_factorization(pyscf_mf,name='molecule',rank_range=range(50,401,25),ch
         print("{}".format('-'*89),file=f)
     for rank in rank_range:
         # First, up: lambda and CCSD(T)
-        eri_rr, LR = sf.rank_reduce(pyscf_mf._eri, cholesky_dim=rank)
+        eri_rr, LR = sf.rank_reduce(pyscf_mf._eri, rank)
         lam = sf.compute_lambda(pyscf_mf, LR)
         escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr)
         error = (etot - exact_etot)*1E3  # to mEh

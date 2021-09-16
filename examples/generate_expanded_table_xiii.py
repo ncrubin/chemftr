@@ -29,6 +29,7 @@ Expected output:
 import sys
 from chemftr import df
 from chemftr.molecule import load_casfile_to_pyscf
+from chemftr.util import RunSilent
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
@@ -39,5 +40,6 @@ THRESH_RANGE = [0.05, 0.025, 0.0125, 0.01, 0.0075, 0.005, 0.0025, 0.00125, 0.001
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 reiher_mol, reiher_mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
 
-# This writes out to file "double_factorization_reiher_femoco.txt"
-df.double_factorization(reiher_mf, name='reiher_femoco', thresh_range=THRESH_RANGE, dE=DE, chi=CHI, beta=BETA)
+with RunSilent():
+    # This writes out to file "double_factorization_reiher_femoco.txt"
+    df.generate_costing_table(reiher_mf, name='reiher_femoco', thresh_range=THRESH_RANGE, dE=DE, chi=CHI, beta=BETA)

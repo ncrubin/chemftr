@@ -1,9 +1,8 @@
 """ Do the costing estimated for a water molecule """
 
 from pyscf import gto, scf
+from chemftr import sf, df
 from chemftr.molecule import stability, localize, avas_active_space
-from chemftr.sf import single_factorization
-from chemftr.df import double_factorization
 
 # input is just like any other PySCF script
 mol = gto.M(
@@ -29,7 +28,7 @@ mf = localize(mf, loc_type='pm')  # default is loc_type ='pm' (Pipek-Mezey)
 mol, mf = avas_active_space(mf, ao_list=['H 1s', 'O 2s', 'O 2p', 'O 3s', 'O 3p'], minao='ccpvtz') 
 
 # make pretty SF costing table
-single_factorization(mf, name='water', rank_range=[20,25,30,35,40,45,50])
+sf.generate_costing_table(mf, name='water', rank_range=[20,25,30,35,40,45,50])
 
 # make pretty DF costing table
-double_factorization(mf, name='water', thresh_range=[1e-2,5e-3,1e-3,5e-4,1e-4,5e-5,1e-5]) 
+df.generate_costing_table(mf, name='water', thresh_range=[1e-2,5e-3,1e-3,5e-4,1e-4,5e-5,1e-5]) 

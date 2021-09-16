@@ -33,7 +33,7 @@ def main():
     # Reference calculation (dim = None is full cholesky / exact ERIs)
     # run silently
     # with RunSilent():
-    escf, ecor, etot = sf.compute_ccsd_t(cholesky_dim=None, integral_path=INTS, use_kernel=USE_KERNEL)
+    escf, ecor, etot = sf.compute_ccsd_t(rank=None, integral_path=INTS, use_kernel=USE_KERNEL)
     exact_ecor = ecor
     exact_etot = etot
 

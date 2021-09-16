@@ -30,6 +30,7 @@ Expected output:
 import sys
 from chemftr import sf
 from chemftr.molecule import load_casfile_to_pyscf
+from chemftr.util import RunSilent
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
@@ -38,5 +39,6 @@ CHI = 10    # number of bits for representation of coefficients
 REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
 reiher_mol, reiher_mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
 
-# This writes out to file "single_factorization_reiher_femoco.txt"
-sf.single_factorization(reiher_mf, name='reiher_femoco',chi=CHI,dE=DE)
+with RunSilent():  # context manager to silence printing to stdout
+    # This writes out to file "single_factorization_reiher_femoco.txt"
+    sf.generate_costing_table(reiher_mf, name='reiher_femoco',chi=CHI,dE=DE)

@@ -1,38 +1,35 @@
 """ Double factorization rank reduction of ERIs """ 
-import sys
 import numpy as np
-from chemftr.sf import rank_reduce as single_factorize
+from chemftr.util import eigendecomp 
 
 
-def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
+def rank_reduce(eri_full, thresh):
     """ Do double factorization of the ERI tensor
 
     Args:
        eri_full (np.ndarray) - 4D (N x N x N x N) full ERI tensor
        thresh (float) - threshold for double factorization
-       reduction (str) - type of initial rank reduction on ERI ('cholesky' or 'eigendecomp')
-       verify_eri (bool) - verify that initial decomposition can reconstruct the ERI tensor
 
     Returns:
-       eri_rr (np.ndarray) - 4D approximate ERI tensor reconstructed from LR vectors
-       LR (np.ndarray) - 3D (N x N x M) tensor containing vectors from rank-reduction
-       R (int) - rank retained from initial eigendecomposition 
-       M (int) - number of eigenvectors 
+       eri_rr (np.ndarray) - 4D approximate ERI tensor reconstructed from df_factors vectors
+       df_factors (np.ndarray) - 3D (N x N x M) tensor containing vectors from rank-reduction
+       rank (int) - rank retained from initial eigendecomposition 
+       num_eigenvectors (int) - number of eigenvectors 
     """
-    _, L = single_factorize(eri_full, cholesky_dim=None, reduction=reduction, verify_eri=verify_eri)
 
     n_orb = eri_full.shape[0]
     assert n_orb**4 == len(eri_full.flatten())
 
-    nchol_max = L.shape[2]
+    # First, do an eigendecomposition of ERIs
+    L = eigendecomp(eri_full.reshape(n_orb**2, n_orb**2),tol=0.0)
+    L = L.reshape(n_orb, n_orb, -1)  # back to (N x N x rank)
+    
+    sf_rank = L.shape[2]
 
-    # double factorized eris
-    eri_rr = np.zeros_like(eri_full)
-
-    M = 0 # rolling number of eigenvectors
-    LR = []  # collect the selected vectors
-    for R in range(nchol_max):
-        Lij = L[:,:, R]
+    num_eigenvectors = 0 # rolling number of eigenvectors
+    df_factors = []  # collect the selected vectors
+    for rank in range(sf_rank):
+        Lij = L[:,:, rank]
         e, v = np.linalg.eigh(Lij)
         normSC = np.sum(np.abs(e))
 
@@ -40,7 +37,7 @@ def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
 
         idx = truncation > thresh
         plus = np.sum(idx)
-        M += plus
+        num_eigenvectors += plus
 
         if plus == 0:
             break
@@ -49,9 +46,12 @@ def double_factorize(eri_full, thresh, reduction='eigendecomp',verify_eri=True):
         v_selected = v[:,idx]
 
         Lij_selected = v_selected.dot(e_selected).dot(v_selected.T)
-        LR.append(Lij_selected)
+        df_factors.append(Lij_selected)
 
-    LR = np.asarray(LR).T
-    eri_rr = np.einsum('ijP,klP', LR, LR, optimize=True)
+    # raw factors from DF algorithm
+    df_factors = np.asarray(df_factors).T
 
-    return eri_rr, LR, R, M
+    # double-factorized and re-constructed ERIs
+    eri_rr = np.einsum('ijP,klP', df_factors, df_factors, optimize=True)
+
+    return eri_rr, df_factors, rank, num_eigenvectors
