@@ -1,6 +1,6 @@
 """Test cases for costing_thc.py
 """
-from chemftr.thc.costing_thc import cost_thc
+from chemftr import thc
 
 
 def test_reiher_thc():
@@ -16,9 +16,9 @@ def test_reiher_thc():
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_thc(N,LAM,DE,CHI,BETA,THC_DIM,stps=20000)
+    output = thc.compute_cost(N,LAM,DE,CHI,BETA,THC_DIM,stps=20000)
     stps1 = output[0]
-    output = cost_thc(N,LAM,DE,CHI,BETA,THC_DIM,stps1)
+    output = thc.compute_cost(N,LAM,DE,CHI,BETA,THC_DIM,stps1)
     assert output == (10912, 5250145120, 2142)
 
 
@@ -35,8 +35,8 @@ def test_li_thc():
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps
     # to give a more accurate number of steps. Then we input that into the function again.
-    output = cost_thc(N,LAM,DE,CHI,BETA,THC_DIM,stps=20000)
+    output = thc.compute_cost(N,LAM,DE,CHI,BETA,THC_DIM,stps=20000)
     stps2 = output[0]
-    output = cost_thc(N,LAM,DE,CHI,BETA,THC_DIM,stps2)
+    output = thc.compute_cost(N,LAM,DE,CHI,BETA,THC_DIM,stps2)
     assert output == (16923, 31938980976, 2196)
     print("OUTPUT (Li): ", output)

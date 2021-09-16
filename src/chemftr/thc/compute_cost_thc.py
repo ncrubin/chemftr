@@ -5,7 +5,7 @@ import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
 
-def cost_thc(n: int, lam: float, dE: float, chi: int, beta: int, M: int, stps: int,
+def compute_cost(n: int, lam: float, dE: float, chi: int, beta: int, M: int, stps: int,
              verbose: bool = False) -> Tuple[int, int, int]:
     """ Determine fault-tolerant costs using THC decomposition in quantum chemistry
 

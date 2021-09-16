@@ -1,5 +1,6 @@
 import chemftr.integrals as int_folder
-from chemftr.thc.computing_lambda_thc import compute_thc_lambda
+from chemftr import thc
+from chemftr.molecule import load_casfile_to_pyscf
 
 import os
 
@@ -16,11 +17,9 @@ def test_lambda():
         MPQ = fid['MPQ'][...]
         etaPp = fid['etaPp'][...]
 
-    with h5py.File(eri_file, 'r') as fid:
-        eri = fid['eri'][...]
-        h0 = fid['h0'][...]
+    mol, mf = load_casfile_to_pyscf(eri_file, num_alpha = 27, num_beta = 27)
 
-    nthc, sqrt_res, res, lambda_T, lambda_z, lambda_tot = \
-        compute_thc_lambda(oei=h0, etaPp=etaPp, MPQ=MPQ, true_eri=eri, use_eri_reconstruct_for_v=False)
+    lambda_tot, nthc, sqrt_res, res, lambda_T, lambda_z  = \
+        thc.compute_lambda(mf, etaPp=etaPp, MPQ=MPQ)
     assert nthc == 250
     assert np.isclose(np.round(lambda_tot), 294)
