@@ -2,7 +2,7 @@
 """
 import numpy as np
 from os import path
-from chemftr.rank_reduce import double_factorize
+from chemftr import df
 from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
 
 def test_reiher_df_ccsd_t():
@@ -18,7 +18,7 @@ def test_reiher_df_ccsd_t():
     # I'm happy to keep it a bit more rigorous for now 
     thresholds = [0.1, 0.00125, 0.00005]
     for THRESH in thresholds:
-        eri_rr, _, _, _ = double_factorize(mf._eri, thresh=THRESH, verify_eri=VERIFY)
+        eri_rr, _, _, _ = df.rank_reduce(mf._eri, thresh=THRESH, verify_eri=VERIFY)
         escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr)
         appx_energy.append(ecorr)
 

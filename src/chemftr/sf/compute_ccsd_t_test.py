@@ -3,7 +3,6 @@
 import numpy as np
 from os import path
 from chemftr import sf
-from chemftr.rank_reduce import single_factorize
 from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
 
 def test_reiher_sf_ccsd_t():
@@ -19,7 +18,7 @@ def test_reiher_sf_ccsd_t():
     # I'm happy to keep it a bit more rigorous for now 
     ranks = [100,200,300]
     for CHOL_DIM in ranks:
-        eri_rr, _ = single_factorize(mf._eri, cholesky_dim=CHOL_DIM, verify_eri=VERIFY)
+        eri_rr, _ = sf.rank_reduce(mf._eri, cholesky_dim=CHOL_DIM, verify_eri=VERIFY)
         escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr) 
         appx_energy.append(ecorr)
 
