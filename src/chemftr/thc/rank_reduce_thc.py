@@ -4,7 +4,7 @@ import time
 import numpy as np
 import uuid
 
-from chemftr.thc.thc_factorization import lbfgsb_opt_thc, adagrad_opt_thc
+from chemftr.thc.utils import lbfgsb_opt_thc_l2reg, adagrad_opt_thc
 
 def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, perform_bfgs_opt=True, 
                 bfgs_chkfile_name=None, bfgs_maxiter=1500, random_start_thc=False, verify=False):
@@ -87,7 +87,7 @@ def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, per
 
         x = np.hstack((thc_leaf.ravel(), thc_central.ravel()))
         lbfgs_start_time = time.time()
-        x = lbfgsb_opt_thc(eri_full, nthc, initial_guess=x, chkfile_name=chkfile, maxiter=bfgs_maxiter)
+        x = lbfgsb_opt_thc_l2reg(eri_full, nthc, initial_guess=x, chkfile_name=chkfile, maxiter=bfgs_maxiter)
         lbfgs_calc_time =  time.time() - lbfgs_start_time
         thc_leaf = x[:norb * nthc].reshape(nthc, norb)  # leaf tensor  nthc x norb
         thc_central = x[norb * nthc:norb * nthc + nthc * nthc].reshape(nthc, nthc)  # central tensor

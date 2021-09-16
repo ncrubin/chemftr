@@ -3,9 +3,9 @@ import os
 # leave one CPU un used  so we can still access this computer
 os.environ["MKL_NUM_THREADS"] = "{}".format(os.cpu_count() - 1)
 
-from chemftr.thc.adagrad import adagrad
-from chemftr.thc.thc_objectives import (thc_objective, thc_objective_grad, thc_objective_and_grad,
-                                        cp_ls_cholesky_factor_objective, thc_objective_regularized)
+from .adagrad import adagrad
+from .thc_objectives import (thc_objective, thc_objective_grad, thc_objective_and_grad,
+                             cp_ls_cholesky_factor_objective, thc_objective_regularized)
 
 import h5py
 import numpy

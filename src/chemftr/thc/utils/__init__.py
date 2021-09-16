@@ -11,9 +11,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-from .spacetime import qubit_vs_toffoli
 
-from .compute_lambda_thc import compute_lambda
-from .compute_cost_thc import compute_cost
-from .rank_reduce_thc import thc_via_cp3 as rank_reduce
-from .generate_costing_table_thc import generate_costing_table
+from .thc_factorization import *
+from .thc_objectives import *
+from .adagrad import *

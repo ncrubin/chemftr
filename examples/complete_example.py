@@ -1,7 +1,7 @@
 """ Do the costing estimated for a water molecule """
 
 from pyscf import gto, scf
-from chemftr import sf, df
+from chemftr import sf, df, thc
 from chemftr.molecule import stability, localize, avas_active_space
 
 # input is just like any other PySCF script
@@ -32,3 +32,6 @@ sf.generate_costing_table(mf, name='water', rank_range=[20,25,30,35,40,45,50])
 
 # make pretty DF costing table
 df.generate_costing_table(mf, name='water', thresh_range=[1e-2,5e-3,1e-3,5e-4,1e-4,5e-5,1e-5]) 
+
+# make pretty THC costing table
+thc.generate_costing_table(mf, name='water', nthc_range=[20,25,30,35,40,45,50]) 
