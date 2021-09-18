@@ -5,7 +5,7 @@ from chemftr import thc
 from chemftr.molecule import rank_reduced_ccsd_t
 
 
-def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=0.001,chi=10,beta=20):
+def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=0.001,chi=10,beta=20,save_thc=False,**kwargs):
     """ Print a table to file for testing how various THC thresholds impact cost, accuracy, etc.
 
     Args:
@@ -15,6 +15,8 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         dE (float) - max allowable phase error (default: 0.001)
         chi (int) - number of bits for representation of coefficients (default: 10)
         beta (int) - not sure, but 20 was deemed sufficient for Li Hamiltonian (default: 20)
+        save_thc (bool) - if True, save the THC factors (leaf and central only) 
+        kwargs: additional keyword arguments to pass to thc.rank_reduce()
  
     Returns:
        None
@@ -56,7 +58,11 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         print("{}".format('-'*92),file=f)                                                                           
     for nthc in nthc_range:                                                                        
         # First, up: lambda and CCSD(T)
-        eri_rr, thc_leaf, thc_central  = thc.rank_reduce(pyscf_mf._eri, nthc) 
+        if save_thc:
+            fname = name + '_nTHC_' + str(nthc).zfill(5)  # will save as HDF5 and add .h5 extension
+        else:
+            fname = None
+        eri_rr, thc_leaf, thc_central, info  = thc.rank_reduce(pyscf_mf._eri, nthc, thc_save_file=fname, **kwargs) 
         lam = thc.compute_lambda(pyscf_mf, thc_leaf, thc_central)[0]
         escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr)
         error = (etot - exact_etot)*1E3  # to mEh
@@ -69,3 +75,8 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
             print("{:^12} {:^24.2f} {:^12.1f} {:^20.1e} {:^20}".format(nthc, error, lam, thc_total_cost, thc_logical_qubits),file=f)                                       
     with open(filename,'a') as f:
         print("{}".format('='*92),file=f)                                                                                  
+
+    with open(filename, 'a') as f:
+        print("THC factorization settings at exit:", file=f)
+        for key, value in info.items():
+            print("\t",key,value, file=f)

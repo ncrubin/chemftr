@@ -23,3 +23,5 @@ def test_lambda():
         thc.compute_lambda(mf, etaPp=etaPp, MPQ=MPQ)
     assert nthc == 250
     assert np.isclose(np.round(lambda_tot), 294)
+
+test_lambda()

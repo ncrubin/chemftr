@@ -1,0 +1,26 @@
+
+ THC factorization data for 'water'.
+    [*] using CAS((5a, 4b), 11o)
+        [+]                      E(SCF):       -75.63393088
+        [+] Active space CCSD(T) E(cor):        -0.08532629
+        [+] Active space CCSD(T) E(tot):       -75.71925716
+============================================================================================
+     M         CCSD(T) error (mEh)       lambda       Toffoli count        logical qubits   
+--------------------------------------------------------------------------------------------
+     20               -8.29               78.9           2.6e+08                370         
+     25                4.14               91.9           3.1e+08                373         
+     30                0.98               92.6           3.2e+08                373         
+     35                1.11               93.7           3.4e+08                378         
+     40               -0.19               93.7           3.5e+08                378         
+     45                0.59               95.5           3.6e+08                379         
+     50                1.69              107.0           4.1e+08                379         
+============================================================================================
+THC factorization settings at exit:
+	 nthc 50
+	 thc_save_file None
+	 first_factor_thresh 1e-14
+	 conv_eps 0.0001
+	 perform_bfgs_opt True
+	 bfgs_maxiter 2500
+	 random_start_thc True
+	 verify False

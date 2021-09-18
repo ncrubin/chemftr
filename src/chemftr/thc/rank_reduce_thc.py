@@ -3,34 +3,43 @@ import sys
 import time
 import numpy as np
 import uuid
+import h5py
 
 from chemftr.thc.utils import lbfgsb_opt_thc_l2reg, adagrad_opt_thc
 
-def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, perform_bfgs_opt=True, 
-                bfgs_chkfile_name=None, bfgs_maxiter=1500, random_start_thc=False, verify=False):
+def thc_via_cp3(eri_full, nthc, thc_save_file=None, first_factor_thresh=1.0E-14, conv_eps=1.0E-4, 
+                perform_bfgs_opt=True, bfgs_maxiter=2500, random_start_thc=True, verify=False):
     """
     THC-CP3 performs an SVD decomposition of the eri matrix followed by a CP decomposition
     via pybtas.  The CP decomposition is assumes the tensor is symmetric in in the first two
     indices corresponding to a reshaped (and rescaled by the signular value) singular vector.
 
     Args:
-        eri_full - (n x n x n x n) eri tensor in Mulliken (Chemists) ordering
-        nthc - number of thc factors to use.
-        first_factor_thresh - SVD threshold on eri matrix.  Default 1.0e-8 because
-                              square of this is numerical precision.
+        eri_full - (N x N x N x N) eri tensor in Mulliken (chemists) ordering
+        nthc (int) - number of THC factors to use
+        thc_save_file (str) - if not None, save output to the input filename (as HDF5)
+        first_factor_thresh - SVD threshold on initial factorization of ERI 
+        conv_eps (float) - convergence threshold on CP3 ALS
         perform_bfgs_opt - Perform extra gradient optimization on top of CP3 decomp
         bfgs_maxiter - Maximum bfgs steps to take. Default 1500.
         random_start_thc - Perform random start for CP3.  If false perform HOSVD start.
         verify - check eri properties. Default is False
 
     returns:
-        THC-eri, etaPp, MPQ.  etaPp and MPQ can be used in lambda calculation.
+        eri_thc - (N x N x N x N) reconstructed ERIs from THC factorization 
+        thc_leaf - THC leaf tensor
+        thc_central - THC central tensor
+        info (dict) - arguments set during the THC factorization
     """
     # fail fast if we don't have the tools to use this routine
     try:
         import pybtas
     except ImportError:
         raise ImportError("pybtas could not be imported. Is it installed and in your PYTHONPATH?")
+
+    info = locals()
+    info.pop('eri_full', None)  # data too big for info dict
+    info.pop('pybtas', None)  # not needed for info dict
     
     norb = eri_full.shape[0]
     if verify:
@@ -80,14 +89,9 @@ def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, per
         print("\tCP3 timing: ", cp3_calc_time)
 
     if perform_bfgs_opt:
-        if bfgs_chkfile_name is None:
-            chkfile = "{}_bfgs_post_cp3.chk".format(str(uuid.uuid4())[:8])
-        else:
-            chkfile = bfgs_chkfile_name
-
         x = np.hstack((thc_leaf.ravel(), thc_central.ravel()))
         lbfgs_start_time = time.time()
-        x = lbfgsb_opt_thc_l2reg(eri_full, nthc, initial_guess=x, chkfile_name=chkfile, maxiter=bfgs_maxiter)
+        x = lbfgsb_opt_thc_l2reg(eri_full, nthc, initial_guess=x, maxiter=bfgs_maxiter)
         lbfgs_calc_time =  time.time() - lbfgs_start_time
         thc_leaf = x[:norb * nthc].reshape(nthc, norb)  # leaf tensor  nthc x norb
         thc_central = x[norb * nthc:norb * nthc + nthc * nthc].reshape(nthc, nthc)  # central tensor
@@ -95,4 +99,11 @@ def thc_via_cp3(eri_full, nthc, first_factor_thresh=1.0E-8, conv_eps=1.0E-4, per
     total_calc_time = time.time() - start_time
 
     eri_thc = np.einsum("Pp,Pr,Qq,Qs,PQ->prqs", thc_leaf, thc_leaf, thc_leaf, thc_leaf, thc_central, optimize=True)
-    return eri_thc, thc_leaf, thc_central
+
+    if thc_save_file is not None: 
+        with h5py.File(thc_save_file+'.h5', 'w') as fid:
+            fid.create_dataset('thc_leaf', data=thc_leaf)
+            fid.create_dataset('thc_central', data=thc_central)
+            fid.create_dataset('info', data=str(info))
+
+    return eri_thc, thc_leaf, thc_central, info

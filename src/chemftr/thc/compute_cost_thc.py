@@ -1,6 +1,6 @@
 """ Determine costs for THC decomposition in QC """
 from typing import Tuple
-from chemftr.util import QR, QI
+from chemftr.utils import QR, QI
 import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 

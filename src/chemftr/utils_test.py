@@ -1,6 +1,6 @@
 """Test cases for util.py
 """
-from chemftr.util import QR, QI, QR2, QI2, power_two
+from chemftr.utils import QR, QI, QR2, QI2, power_two
 
 
 def test_QR():

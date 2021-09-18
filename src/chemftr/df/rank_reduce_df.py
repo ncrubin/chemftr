@@ -1,6 +1,6 @@
 """ Double factorization rank reduction of ERIs """ 
 import numpy as np
-from chemftr.util import eigendecomp 
+from chemftr.utils import eigendecomp 
 
 
 def rank_reduce(eri_full, thresh):

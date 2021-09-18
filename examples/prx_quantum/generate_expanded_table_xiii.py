@@ -27,9 +27,10 @@ Expected output:
 ========================================================================================================================
 """ 
 import sys
+from importlib.resources import files
 from chemftr import df
 from chemftr.molecule import load_casfile_to_pyscf
-from chemftr.util import RunSilent
+from chemftr.utils import RunSilent
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
@@ -37,7 +38,7 @@ BETA = 16   # Value from paper
 THRESH_RANGE = [0.05, 0.025, 0.0125, 0.01, 0.0075, 0.005, 0.0025, 0.00125, 0.001, 0.00075, 0.0005, 0.000125, 0.0001, 0.00005] # various DF thresholds
 
 # eri_reiher.h5 can be found at https://doi.org/10.5281/zenodo.4248322
-REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # path to integrals
+REIHER_INTS = files('chemftr.integrals').joinpath('eri_reiher.h5')  # pre-packaged integrals
 reiher_mol, reiher_mf = load_casfile_to_pyscf(REIHER_INTS, num_alpha = 27, num_beta = 27)
 
 with RunSilent():

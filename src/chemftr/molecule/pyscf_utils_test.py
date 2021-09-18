@@ -4,7 +4,7 @@ import numpy as np
 from os import path
 from pyscf import gto, scf, cc
 from chemftr import sf, df
-from chemftr.util import QR, QI, QR2, QI2, power_two
+from chemftr.utils import QR, QI, QR2, QI2, power_two
 from chemftr.molecule import load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t
 
 

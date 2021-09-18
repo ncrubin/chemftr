@@ -5,7 +5,7 @@ import itertools
 import matplotlib.pyplot as plt
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
-from chemftr.util import QR, QI
+from chemftr.utils import QR, QI
 
 
 def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=False):

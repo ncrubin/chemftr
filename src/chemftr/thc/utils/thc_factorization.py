@@ -89,12 +89,12 @@ def lbfgsb_opt_thc_l2reg(eri, nthc, chkfile_name=None, initial_guess=None, rando
     if disp_freq > 98 or disp_freq < 1:
         raise ValueError("disp_freq {} is not valid. must be between [1, 98]".format(disp_freq))
 
-    # initialize chkfile name if one isn't set
     if chkfile_name is None:
-        chkfile_name = str(uuid4()) + '.h5'
-
-    # callback func stores checkpoints
-    callback_func = CallBackStore(chkfile_name)
+        #chkfile_name = str(uuid4()) + '.h5'
+        callback_func = None
+    else:
+        # callback func stores checkpoints
+        callback_func = CallBackStore(chkfile_name)
 
     # set initial guess
     norb = eri.shape[0]
@@ -138,10 +138,11 @@ def lbfgsb_opt_thc_l2reg(eri, nthc, chkfile_name=None, initial_guess=None, rando
     # print(res)
     params = numpy.array(res.x)
     x = numpy.array(params)
-    f = h5py.File(chkfile_name, "w")
-    f["etaPp"] = x[:norb*nthc].reshape(nthc,norb)
-    f["ZPQ"] = x[norb*nthc:].reshape(nthc,nthc)
-    f.close()
+    if chkfile_name is not None:
+        f = h5py.File(chkfile_name, "w")
+        f["etaPp"] = x[:norb*nthc].reshape(nthc,norb)
+        f["ZPQ"] = x[norb*nthc:].reshape(nthc,nthc)
+        f.close()
     return params
 
 

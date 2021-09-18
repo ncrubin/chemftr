@@ -20,14 +20,15 @@ Expected output:
 """
 import os
 import numpy as np
-from chemftr import sf, df, thc
+from importlib.resources import files
+from chemftr import sf, df
 from chemftr.molecule import load_casfile_to_pyscf
 
 """ Global defaults from paper """
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
-REIHER_INTS = '../src/chemftr/integrals/eri_reiher.h5'  # replace with your path to integrals
-LI_INTS = '../src/chemftr/integrals/eri_li.h5'  # replace with your path to integrals
+REIHER_INTS = files('chemftr.integrals').joinpath('eri_reiher.h5')  # pre-packaged integrals
+LI_INTS = files('chemftr.integrals').joinpath('eri_li.h5')  # pre-packaged integrals
 
 if os.path.isfile(REIHER_INTS):
 
@@ -70,22 +71,6 @@ if os.path.isfile(REIHER_INTS):
     print("      [-] Toffoli count:  %.1e" % df_total_cost)
     assert df_logical_qubits == 3725
     assert '{:.1e}'.format(df_total_cost) == '1.0e+10'
-
-    """ THC factorization on Reiher FeMoco """
-    BETA = 16
-    NTHC = 350 
-    _, thc_leaf, thc_central = thc.rank_reduce(mf._eri, NTHC)
-    lam = thc.compute_lambda(mf, thc_leaf, thc_central)[0]
-    
-   # # Here we're using an initial calculation with a very rough estimate of the number of steps
-   # # to give a more accurate number of steps. Then we input that into the function again.
-    stps2 = thc.compute_cost(n_orb, lam, DE, chi=CHI, beta=BETA, M=NTHC, stps=20000)[0]
-    thc_cost, thc_total_cost, thc_logical_qubits = thc.compute_cost(n_orb, lam, DE, chi=CHI, \
-        beta=BETA, M=NTHC, stps=stps2)
-    
-    print("  [+] THC Factorization: ")
-    print("      [-] Logical qubits: %s" % thc_logical_qubits)
-    print("      [-] Toffoli count:  %.1e" % thc_total_cost)
 
 if os.path.isfile(LI_INTS):
     """ Load Li FeMoco into memory """

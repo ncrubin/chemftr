@@ -1,4 +1,4 @@
-""" Do the costing estimated for a water molecule """
+""" Do the costing estimated for an ionized water molecule """
 
 from pyscf import gto, scf
 from chemftr import sf, df, thc
@@ -10,7 +10,7 @@ mol = gto.M(
               H    0.866811829    0.601435779    0.000000
               H   -0.866811829    0.601435779    0.000000
            ''',
-    basis = 'ccpvtz',
+    basis = 'augccpvtz',
     symmetry = False,
     charge = 1,
     spin = 1
@@ -24,6 +24,7 @@ mf = stability(mf)
 
 # localize before automatically selecting active space with AVAS
 mf = localize(mf, loc_type='pm')  # default is loc_type ='pm' (Pipek-Mezey)
+
 # you can use larger basis for `minao` to select non-valence...here select O 3s and 3p as well 
 mol, mf = avas_active_space(mf, ao_list=['H 1s', 'O 2s', 'O 2p', 'O 3s', 'O 3p'], minao='ccpvtz') 
 
@@ -34,4 +35,5 @@ sf.generate_costing_table(mf, name='water', rank_range=[20,25,30,35,40,45,50])
 df.generate_costing_table(mf, name='water', thresh_range=[1e-2,5e-3,1e-3,5e-4,1e-4,5e-5,1e-5]) 
 
 # make pretty THC costing table
-thc.generate_costing_table(mf, name='water', nthc_range=[20,25,30,35,40,45,50]) 
+# if you want to save each THC result to a file, you can set 'save_thc' to True
+thc.generate_costing_table(mf, name='water', nthc_range=[20,25,30,35,40,45,50], save_thc=False) 

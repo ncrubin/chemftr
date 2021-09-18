@@ -1,6 +1,6 @@
 """ Determine costs for sparse decomposition in QC """
 from typing import Tuple
-from chemftr.util import QI, power_two
+from chemftr.utils import QI, power_two
 import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 

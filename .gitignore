@@ -123,6 +123,6 @@ dmypy.json
 # ignore vim swap files
 *.swp
 
-# ignore generated .txt files and .molden files
-*.txt
+# ignore generated .molden files and .chk files
+*.chk
 *.molden
