@@ -30,7 +30,10 @@ Expected output:
 ========================================================================================================================
 """ 
 import sys
-from importlib.resources import files
+try:                                                                                                 
+    from importlib.resources import files                                                            
+except ImportError:                                                                                  
+    from importlib_resources import files                                                            
 from chemftr import df
 from chemftr.molecule import load_casfile_to_pyscf
 from chemftr.utils import RunSilent

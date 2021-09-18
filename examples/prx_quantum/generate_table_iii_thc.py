@@ -9,7 +9,10 @@ Expected output:
 """
 import os
 import numpy as np
-from importlib.resources import files
+try:                                                                                                 
+    from importlib.resources import files                                                            
+except ImportError:                                                                                  
+    from importlib_resources import files                                                            
 from chemftr import sf, df, thc
 from chemftr.molecule import load_casfile_to_pyscf
 

@@ -24,7 +24,10 @@ Table XIII. Double low rank factorization data for
   0.000050       645         28469        296.8              -0.00
 ============================================================================
 """
-from importlib.resources import files
+try:                                                                                                 
+    from importlib.resources import files                                                            
+except ImportError:                                                                                  
+    from importlib_resources import files                                                            
 from chemftr import df
 from chemftr.utils import RunSilent
 from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t

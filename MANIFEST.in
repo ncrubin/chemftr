@@ -1,1 +1,1 @@
-include chemftr/integrals
+include src/chemftr/integrals/*.h5

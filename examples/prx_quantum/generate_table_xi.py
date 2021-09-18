@@ -26,7 +26,10 @@ Table XI. Single low rank factorization data for
 """ 
 import sys
 import os
-from importlib.resources import files
+try:                                                                                                 
+    from importlib.resources import files                                                            
+except ImportError:                                                                                  
+    from importlib_resources import files                                                            
 from chemftr import sf
 from chemftr.utils import RunSilent
 from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
