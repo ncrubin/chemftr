@@ -30,8 +30,10 @@ Expected output:
 ========================================================================================================================
 """ 
 import sys
+from importlib.resources import files
 from chemftr import df
 from chemftr.molecule import load_casfile_to_pyscf
+from chemftr.utils import RunSilent
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
@@ -40,8 +42,9 @@ THRESH_RANGE = [0.05, 0.025, 0.0125, 0.01, 0.0075, 0.005, 0.0025, 0.00125, 0.001
                 0.000125, 0.0001, 0.00005] # various DF thresholds
 
 # eri_li.h5 can be found at https://doi.org/10.5281/zenodo.4248322
-LI_INTS = '../src/chemftr/integrals/eri_li.h5'  # path to integrals
+LI_INTS = files('chemftr.integrals').joinpath('eri_li.h5')  # pre-packaged integrals
 li_mol, li_mf = load_casfile_to_pyscf(LI_INTS, num_alpha = 74, num_beta = 39)
 
-# This writes out to file "double_factorization_li_femoco.txt"
-df.double_factorization(li_mf,name='li_femoco',thresh_range=THRESH_RANGE,dE=DE,chi=CHI,beta=BETA)
+with RunSilent():
+    # This writes out to file "double_factorization_li_femoco.txt"
+    df.generate_costing_table(li_mf,name='li_femoco',thresh_range=THRESH_RANGE,dE=DE,chi=CHI,beta=BETA)

@@ -3,26 +3,32 @@ Compute lambdas for THC according to
 PRX QUANTUM 2, 030305 (2021) Section II. D.
 """
 import numpy as np
+from chemftr.molecule import pyscf_to_cas
 
 
-def compute_thc_lambda(oei: np.ndarray, etaPp: np.ndarray, MPQ: np.ndarray, true_eri: np.ndarray,
-                       use_eri_reconstruct_for_v=False):
+def compute_lambda(pyscf_mf, etaPp: np.ndarray, MPQ: np.ndarray, use_eri_thc_for_t=False):
     """
     Compute lambda thc
 
-    :param  oei: one-electron spatial orbitals
-    :param etaPp: leaf tensor for THC that is  nthc x norb.  The nthc and norb is
+    Args: 
+        pyscf_mf - PySCF mean field object
+        etaPp - leaf tensor for THC that is dim(nthc x norb).  The nthc and norb is
                 inferred from this quantity.
-    :param MPQ:  central tensor for THC factorization. nthc x nthc
-    :param true_eri: true two-electron spatial integrals (11'|22')  ordering--AKA chemist order
-    zeta"""
+        MPQ - central tensor for THC factorization. dim(nthc x nthc)
+
+    Returns:
+    """
+
     nthc = etaPp.shape[0]
+
+    # grab tensors from pyscf_mf object
+    h1, eri_full, _, _, _ = pyscf_to_cas(pyscf_mf)
 
     # computing Least-squares THC residual
     CprP = np.einsum("Pp,Pr->prP", etaPp, etaPp)  # this is einsum('mp,mq->pqm', etaPp, etaPp)
     BprQ = np.tensordot(CprP, MPQ, axes=([2], [0]))
     Iapprox = np.tensordot(CprP, np.transpose(BprQ), axes=([2], [0]))
-    deri = true_eri - Iapprox
+    deri = eri_full - Iapprox
     res = 0.5 * np.sum((deri) ** 2)
 
     # NOTE: remove in future once we resolve why it was being used in the first place.
@@ -39,16 +45,17 @@ def compute_thc_lambda(oei: np.ndarray, etaPp: np.ndarray, MPQ: np.ndarray, true
     lambda_z = np.sum(np.abs(MPQ_normalized)) * 0.5  # Eq. 13
     # NCR: originally Joonho's code add np.einsum('llij->ij', eri_thc)
     # NCR: I don't know how much this matters.
-    if use_eri_reconstruct_for_v:
+    if use_eri_thc_for_t:
         # use eri_thc for second coulomb contraction.  This was in the original code which is different than what the
         # paper says.
-        T = oei - 0.5 * np.einsum("illj->ij", true_eri) + np.einsum("llij->ij", eri_thc)  # Eq. 3 + Eq. 18
+        T = h1 - 0.5 * np.einsum("illj->ij", eri_full) + np.einsum("llij->ij", eri_thc)  # Eq. 3 + Eq. 18
     else:
-        T = oei - 0.5 * np.einsum("illj->ij", true_eri) + np.einsum("llij->ij", true_eri)  # Eq. 3 + Eq. 18
+        T = h1 - 0.5 * np.einsum("illj->ij", eri_full) + np.einsum("llij->ij", eri_full)  # Eq. 3 + Eq. 18
     e, v = np.linalg.eigh(T)
     lambda_T = np.sum(np.abs(e))  # Eq. 19. NOTE: sum over spin orbitals removes 1/2 factor
 
     lambda_tot = lambda_z + lambda_T  # Eq. 20
 
-    return nthc, np.sqrt(res), res, lambda_T, lambda_z, lambda_tot
+    #return nthc, np.sqrt(res), res, lambda_T, lambda_z, lambda_tot
+    return lambda_tot, nthc, np.sqrt(res), res, lambda_T, lambda_z
 

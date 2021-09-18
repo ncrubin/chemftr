@@ -66,6 +66,7 @@ def main() -> None:
         license='Apache 2',
         packages=find_packages(where='src'),
         package_dir={'': 'src'},
+        include_package_data = True, 
         )
 
 

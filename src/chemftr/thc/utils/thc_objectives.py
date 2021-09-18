@@ -12,7 +12,7 @@ config.update("jax_enable_x64", True)
 # from jax.experimental import optimizers
 from  jax import jit, grad
 
-from chemftr.thc.adagrad import adagrad
+from .adagrad import adagrad
 
 import h5py
 import numpy

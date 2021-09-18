@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from .compute_lambda_df import compute_lambda
-from .compute_cost_df import compute_cost
-from .rank_reduce_df import rank_reduce
-from .generate_costing_table_df import generate_costing_table
+from .thc_factorization import *
+from .thc_objectives import *
+from .adagrad import *

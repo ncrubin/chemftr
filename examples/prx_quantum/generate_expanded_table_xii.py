@@ -31,15 +31,18 @@ Expected output:
 =========================================================================================
 """ 
 import sys
+from importlib.resources import files
 from chemftr import sf
 from chemftr.molecule import load_casfile_to_pyscf, stability, pyscf_to_cas
+from chemftr.utils import RunSilent
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
 
 # eri_li.h5 can be found at https://doi.org/10.5281/zenodo.4248322
-LI_INTS = '../src/chemftr/integrals/eri_li.h5'  # path to integrals
+LI_INTS = files('chemftr.integrals').joinpath('eri_li.h5')  # pre-packaged integrals
 li_mol, li_mf = load_casfile_to_pyscf(LI_INTS, num_alpha = 74, num_beta = 39)
 
-# This writes out to file "single_factorization_li_femoco.txt"
-sf.single_factorization(li_mf, name='li_femoco',chi=CHI,dE=DE)
+with RunSilent():
+    # This writes out to file "single_factorization_li_femoco.txt"
+    sf.generate_costing_table(li_mf, name='li_femoco',chi=CHI,dE=DE)

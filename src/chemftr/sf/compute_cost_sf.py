@@ -1,6 +1,6 @@
 """ Determine costs for SF decomposition in QC """
 from typing import Tuple
-from chemftr.util import QR, QI, QR2, power_two
+from chemftr.utils import QR, QI, QR2, power_two
 import numpy as np
 from numpy.lib.scimath import arccos, arcsin  # want version that has analytic continuation to cplx
 
