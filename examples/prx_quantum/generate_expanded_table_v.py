@@ -21,4 +21,4 @@ LI_INTS = files('chemftr.integrals').joinpath('eri_li.h5')  # pre-packaged integ
 li_mol, li_mf = load_casfile_to_pyscf(LI_INTS, num_alpha = 74, num_beta = 39)
 
 # This writes out to file "thc_factorization_LI_femoco.txt"
-thc.generate_costing_table(li_mf, name='li_femoco', nthc_range=range(250,801,50), dE=DE, chi=CHI, beta=BETA, save_thc=False)
+thc.generate_costing_table(li_mf, name='li_femoco', nthc_range=range(350,801,50), dE=DE, chi=CHI, beta=BETA, save_thc=False, conv_eps=1E-5, bfgs_maxiter=10000)
