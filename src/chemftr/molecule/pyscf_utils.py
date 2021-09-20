@@ -333,13 +333,15 @@ def save_pyscf_to_casfile(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
-def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True) -> Tuple[float, float, float]:
+def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True, no_triples=False)\
+    -> Tuple[float, float, float]:
     """ Compute CCSD(T) energy using rank-reduced ERIs
 
     Args:
         pyscf_mf - PySCF mean field object
         eri_rr (ndarray) - rank-reduced ERIs, otherwise use full ERIs from pyscf_mf
         use_kernel (bool) - re-do SCF, using canonical orbitals for one-body contributions?
+        no_triples (bool) - skip the perturbative triples correction? (e.g. just do CCSD)
 
     Returns:
         e_scf (float) - SCF energy
@@ -352,7 +354,8 @@ def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True) -> Tuple[flo
     if eri_rr is None:
         eri_rr = eri_full
 
-    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full, use_kernel)
+    e_scf, e_cor, e_tot = ccsd_t(h1, eri_rr, ecore, num_alpha, num_beta, eri_full, use_kernel,\
+        no_triples)
 
     return e_scf, e_cor, e_tot
 

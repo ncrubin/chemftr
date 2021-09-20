@@ -5,7 +5,7 @@ from chemftr import df
 from chemftr.molecule import rank_reduced_ccsd_t
 
 
-def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001,chi=10,beta=20):
+def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001,chi=10,beta=20, use_kernel=True,no_triples=False):
     """ Print a table to file for testing how various DF thresholds impact cost, accuracy, etc.
 
     Args:
@@ -38,7 +38,7 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
     cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
                                                                                                          
     # Reference calculation (eri_rr= None is full rank / exact ERIs)                                   
-    escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None)
+    escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
 
     exact_ecor = ecor
     exact_etot = etot
@@ -49,16 +49,23 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
         print("\n Double low rank factorization data for '"+name+"'.",file=f) 
         print("    [*] using "+cas_info,file=f)                                          
         print("        [+]                      E(SCF): %18.8f" % escf,file=f) 
-        print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
-        print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
+        if no_triples:
+            print("        [+] Active space CCSD E(cor):    %18.8f" % ecor,file=f)
+            print("        [+] Active space CCSD E(tot):    %18.8f" % etot,file=f)
+        else:
+            print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
+            print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
         print("{}".format('='*120),file=f)                                                                           
-        print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+        if no_triples:
+            print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+        else:
+            print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
         print("{}".format('-'*120),file=f)                                                                           
     for thresh in thresh_range:                                                                        
         # First, up: lambda and CCSD(T)
         eri_rr, LR, L, Lxi = df.rank_reduce(pyscf_mf._eri, thresh=thresh) 
         lam = df.compute_lambda(pyscf_mf, LR)
-        escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr)
+        escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
       
         # now do costing
