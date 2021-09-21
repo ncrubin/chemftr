@@ -8,7 +8,7 @@ import h5py
 from chemftr.thc.utils import lbfgsb_opt_thc_l2reg, adagrad_opt_thc
 
 def thc_via_cp3(eri_full, nthc, thc_save_file=None, first_factor_thresh=1.0E-14, conv_eps=1.0E-4, 
-                perform_bfgs_opt=True, bfgs_maxiter=2500, random_start_thc=True, verify=False):
+                perform_bfgs_opt=True, bfgs_maxiter=5000, random_start_thc=True, verify=False):
     """
     THC-CP3 performs an SVD decomposition of the eri matrix followed by a CP decomposition
     via pybtas.  The CP decomposition is assumes the tensor is symmetric in in the first two

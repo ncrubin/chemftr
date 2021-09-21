@@ -1,5 +1,5 @@
 """ Pretty-print a table comparing number of SF vectors retained versus accuracy and cost """
-
+import numpy as np
 from pyscf import scf
 from chemftr import sf
 from chemftr.molecule import rank_reduced_ccsd_t
@@ -14,6 +14,9 @@ def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),
         rank_range (list of ints) - list number of vectors to retain in SF algorithm
         dE (float) - max allowable phase error (default: 0.001)
         chi (int) - number of bits for representation of coefficients (default: 10)
+        use_kernel (bool) - re-do SCF prior to estimating CCSD(T) error? Will use canonical orbitals
+            and full ERIs for the one-body contributions, using rank-reduced ERIs for two-body
+        no_triples (bool) - if True, skip the (T) correction, doing only rank-reduced CCSD
 
     Returns:
        None
@@ -53,20 +56,21 @@ def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),
         else:
             print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
             print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
-        print("{}".format('='*89),file=f)
+        print("{}".format('='*108),file=f)
         if no_triples:
-            print("{:^12} {:^12} {:^24} {:^20} {:^20}".format('L','lambda','CCSD error (mEh)',\
+            print("{:^12} {:^18} {:^12} {:^24} {:^20} {:^20}".format('L','||ERI - SF||','lambda','CCSD error (mEh)',\
             'logical qubits', 'Toffoli count'),file=f)
         else:
-            print("{:^12} {:^12} {:^24} {:^20} {:^20}".format('L','lambda','CCSD(T) error (mEh)',\
+            print("{:^12} {:^18} {:^12} {:^24} {:^20} {:^20}".format('L','||ERI - SF||','lambda','CCSD(T) error (mEh)',\
             'logical qubits', 'Toffoli count'),file=f)
-        print("{}".format('-'*89),file=f)
+        print("{}".format('-'*108),file=f)
     for rank in rank_range:
         # First, up: lambda and CCSD(T)
         eri_rr, LR = sf.rank_reduce(pyscf_mf._eri, rank)
         lam = sf.compute_lambda(pyscf_mf, LR)
         escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
+        l2_norm_error_eri = np.linalg.norm(eri_rr - pyscf_mf._eri)  # eri reconstruction error
 
         # now do costing
         stps1 = sf.compute_cost(num_spinorb, lam, DE, L=rank, chi=CHI, stps=20000)[0]
@@ -74,7 +78,7 @@ def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),
                                                                 stps=stps1)
 
         with open(filename,'a') as f:
-            print("{:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(rank,lam,error, sf_logical_qubits, sf_total_cost),file=f)                                       
+            print("{:^12} {:^18.4e} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(rank,l2_norm_error_eri,lam,error, sf_logical_qubits, sf_total_cost),file=f)                                       
     with open(filename,'a') as f:
-        print("{}".format('='*89),file=f)                                                                                  
+        print("{}".format('='*108),file=f)                                                                                  
 

@@ -1,5 +1,5 @@
 """ Pretty-print a table comparing number of SF vectors retained versus accuracy and cost """
-
+import numpy as np
 from pyscf import scf
 from chemftr import thc 
 from chemftr.molecule import rank_reduced_ccsd_t
@@ -10,12 +10,15 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
 
     Args:
         pyscf_mf - PySCF mean field object
-        name (str) - file will be saved to 'double_factorization_<name>.txt'
+        name (str) - file will be saved to 'thc_factorization_<name>.txt'
         nthc_range (list of ints) - list of number of THC vectors to retain in THC algorithm
         dE (float) - max allowable phase error (default: 0.001)
         chi (int) - number of bits for representation of coefficients (default: 10)
         beta (int) - not sure, but 20 was deemed sufficient for Li Hamiltonian (default: 20)
         save_thc (bool) - if True, save the THC factors (leaf and central only) 
+        use_kernel (bool) - re-do SCF prior to estimating CCSD(T) error? Will use canonical orbitals
+            and full ERIs for the one-body contributions, using rank-reduced ERIs for two-body
+        no_triples (bool) - if True, skip the (T) correction, doing only rank-reduced CCSD
         kwargs: additional keyword arguments to pass to thc.rank_reduce()
  
     Returns:
@@ -57,12 +60,12 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         else:
             print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
             print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
-        print("{}".format('='*92),file=f)                                                                           
+        print("{}".format('='*111),file=f)                                                                           
         if no_triples:
-            print("{:^12} {:^24} {:^12} {:^20} {:^20}".format('M','CCSD error (mEh)','lambda', 'Toffoli count', 'logical qubits'),file=f)                             
+            print("{:^12} {:^18} {:^24} {:^12} {:^20} {:^20}".format('M','||ERI - THC||','CCSD error (mEh)','lambda', 'Toffoli count', 'logical qubits'),file=f)                             
         else:
-            print("{:^12} {:^24} {:^12} {:^20} {:^20}".format('M','CCSD(T) error (mEh)','lambda', 'Toffoli count', 'logical qubits'),file=f)                             
-        print("{}".format('-'*92),file=f)                                                                           
+            print("{:^12} {:^18} {:^24} {:^12} {:^20} {:^20}".format('M','||ERI - THC||','CCSD(T) error (mEh)','lambda', 'Toffoli count', 'logical qubits'),file=f)                             
+        print("{}".format('-'*111),file=f)                                                                           
     for nthc in nthc_range:                                                                        
         # First, up: lambda and CCSD(T)
         if save_thc:
@@ -73,15 +76,16 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         lam = thc.compute_lambda(pyscf_mf, thc_leaf, thc_central)[0]
         escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
+        l2_norm_error_eri = np.linalg.norm(eri_rr - pyscf_mf._eri)  # ERI reconstruction error
       
         # now do costing
         stps1 = thc.compute_cost(num_spinorb, lam, DE, chi=CHI, beta=BETA, M=nthc, stps=20000)[0]
         thc_cost, thc_total_cost, thc_logical_qubits = thc.compute_cost(num_spinorb, lam, DE, chi=CHI, beta=BETA, M=nthc, stps=stps1)
 
         with open(filename,'a') as f:
-            print("{:^12} {:^24.2f} {:^12.1f} {:^20.1e} {:^20}".format(nthc, error, lam, thc_total_cost, thc_logical_qubits),file=f)                                       
+            print("{:^12} {:^18.4e} {:^24.2f} {:^12.1f} {:^20.1e} {:^20}".format(nthc, l2_norm_error_eri, error, lam, thc_total_cost, thc_logical_qubits),file=f)                                       
     with open(filename,'a') as f:
-        print("{}".format('='*92),file=f)                                                                                  
+        print("{}".format('='*111),file=f)                                                                                  
 
     with open(filename, 'a') as f:
         print("THC factorization settings at exit:", file=f)

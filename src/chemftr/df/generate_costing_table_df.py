@@ -1,5 +1,5 @@
-""" Pretty-print a table comparing number of SF vectors retained versus accuracy and cost """
-
+""" Pretty-print a table comparing DF vector threshold versus accuracy and cost """
+import numpy as np
 from pyscf import scf
 from chemftr import df
 from chemftr.molecule import rank_reduced_ccsd_t
@@ -15,6 +15,9 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
         dE (float) - max allowable phase error (default: 0.001)
         chi (int) - number of bits for representation of coefficients (default: 10)
         beta (int) - not sure, but 20 was deemed sufficient for Li Hamiltonian (default: 20)
+        use_kernel (bool) - re-do SCF prior to estimating CCSD(T) error? Will use canonical orbitals
+            and full ERIs for the one-body contributions, using rank-reduced ERIs for two-body
+        no_triples (bool) - if True, skip the (T) correction, doing only rank-reduced CCSD
  
     Returns:
        None
@@ -55,24 +58,25 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
         else:
             print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
             print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
-        print("{}".format('='*120),file=f)                                                                           
+        print("{}".format('='*139),file=f)                                                                           
         if no_triples:
-            print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+            print("{:^12} {:^18} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','||ERI - DF||','L','eigenvectors','lambda','CCSD error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
         else:
-            print("{:^12} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
-        print("{}".format('-'*120),file=f)                                                                           
+            print("{:^12} {:^18} {:^12} {:^12} {:^12} {:^24} {:^20} {:^20}".format('threshold','||ERI - DF||','L','eigenvectors','lambda','CCSD(T) error (mEh)','logical qubits', 'Toffoli count'),file=f)                             
+        print("{}".format('-'*139),file=f)                                                                           
     for thresh in thresh_range:                                                                        
         # First, up: lambda and CCSD(T)
         eri_rr, LR, L, Lxi = df.rank_reduce(pyscf_mf._eri, thresh=thresh) 
         lam = df.compute_lambda(pyscf_mf, LR)
         escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
+        l2_norm_error_eri = np.linalg.norm(eri_rr - pyscf_mf._eri)  # ERI reconstruction error
       
         # now do costing
         stps1 = df.compute_cost(num_spinorb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=20000)[0]
         df_cost, df_total_cost, df_logical_qubits = df.compute_cost(num_spinorb, lam, DE, L=L, Lxi=Lxi, chi=CHI, beta=BETA, stps=stps1)
 
         with open(filename,'a') as f:
-            print("{:^12.6f} {:^12} {:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(thresh,L,Lxi,lam,error, df_logical_qubits, df_total_cost),file=f)                                       
+            print("{:^12.6f} {:^18.4e} {:^12} {:^12} {:^12.1f} {:^24.2f} {:^20} {:^20.1e}".format(thresh,l2_norm_error_eri,L,Lxi,lam,error, df_logical_qubits, df_total_cost),file=f)                                       
     with open(filename,'a') as f:
-        print("{}".format('='*120),file=f)                                                                                  
+        print("{}".format('='*139),file=f)                                                                                  
