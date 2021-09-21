@@ -52,8 +52,8 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         print("    [*] using "+cas_info,file=f)                                          
         print("        [+]                      E(SCF): %18.8f" % escf,file=f) 
         if no_triples:
-            print("        [+] Active space CCSD E(cor):    %18.8f" % ecor,file=f)
-            print("        [+] Active space CCSD E(tot):    %18.8f" % etot,file=f)
+            print("        [+]    Active space CCSD E(cor): %18.8f" % ecor,file=f)
+            print("        [+]    Active space CCSD E(tot): %18.8f" % etot,file=f)
         else:
             print("        [+] Active space CCSD(T) E(cor): %18.8f" % ecor,file=f)
             print("        [+] Active space CCSD(T) E(tot): %18.8f" % etot,file=f)
