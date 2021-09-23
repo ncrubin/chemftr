@@ -2,7 +2,7 @@
 import numpy as np
 from pyscf import scf
 from chemftr import sf
-from chemftr.molecule import rank_reduced_ccsd_t
+from chemftr.molecule import rank_reduced_ccsd_t, cas_to_pyscf, pyscf_to_cas
 
 
 def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),chi=10,dE=0.001,use_kernel=True,no_triples=False):
@@ -37,6 +37,12 @@ def generate_costing_table(pyscf_mf,name='molecule',rank_range=range(50,401,25),
     num_spinorb = num_orb * 2
 
     cas_info = "CAS((%sa, %sb), %so)" % (num_alpha, num_beta, num_orb)
+
+    try:
+        assert num_orb ** 4 == len(pyscf_mf._eri.flatten())
+    except AssertionError:
+        # ERIs are not in correct form in pyscf_mf._eri, so this is a quick hack to prep system
+        pyscf_mol, pyscf_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf))
 
     # Reference calculation (eri_rr = None is full rank / exact ERIs)
     escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
