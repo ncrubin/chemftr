@@ -439,7 +439,7 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         mf.level_shift = 0.5
         mf.conv_check = False
         mf.max_cycle = 800
-        mf.kernel()
+        mf.kernel(mf.make_rdm1(mf.mo_coeff, mf.mo_occ)) # use MO info to generate guess
         mf = stability(mf)
         mf = stability(mf)
 
