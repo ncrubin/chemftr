@@ -1,5 +1,4 @@
 """ Drivers for various PySCF electronic structure routines """
-
 from typing import Tuple, Optional
 import sys
 import h5py
@@ -432,7 +431,7 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     # optimal for the CCSD(T) calculation (canonical gives better energy estimate whereas QPE is
     # invariant to choice of basis)
     if use_kernel: 
-        mf.conv_tol = 1e-8
+        mf.conv_tol = 1e-7
         mf.init_guess = '1e'
         mf.verbose=4
         mf.diis_space = 24
@@ -440,6 +439,9 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
         mf.conv_check = False
         mf.max_cycle = 800
         mf.kernel(mf.make_rdm1(mf.mo_coeff, mf.mo_occ)) # use MO info to generate guess
+        mf = stability(mf)
+        mf = stability(mf)
+        mf = stability(mf)
         mf = stability(mf)
         mf = stability(mf)
 
