@@ -5,7 +5,8 @@ from os import path
 from pyscf import gto, scf, cc
 from chemftr import sf, df
 from chemftr.utils import QR, QI, QR2, QI2, power_two
-from chemftr.molecule import load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t
+from chemftr.molecule import (load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t,
+                              open_shell_t1_d1, )
 
 
 def test_full_ccsd_t():
@@ -137,3 +138,28 @@ def test_reiher_df_ccsd_t():
     error = (appx_energy - exact_energy)*1E3  # mEh
 
     assert np.allclose(np.round(error,decimals=2),[-87.91,0.44,0.00])
+
+def test_t1_d1_openshell():
+    """Test open shell t1-diagnostic by reducing back to closed shell"""
+    mol = gto.M()
+    mol.atom = 'N 0 0 0; N 0 0 1.4'
+    mol.basis = 'cc-pvtz'
+    mol.spin = 0
+    mol.build()
+
+    mf = scf.RHF(mol)
+    mf.kernel()
+
+    mycc = cc.CCSD(mf)
+    mycc.kernel()
+
+    true_t1d, true_d1d = mycc.get_t1_diagnostic(), mycc.get_d1_diagnostic()
+
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(uhf_mf)
+    mycc_uhf.kernel()
+    t1a, t1b = mycc_uhf.t1
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], uhf_mf.nelec[0], uhf_mf.nelec[1])
+
+    assert np.isclose(test_t1d, true_t1d)
+    assert np.isclose(test_d1d, true_d1d)
