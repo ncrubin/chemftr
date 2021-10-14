@@ -166,6 +166,64 @@ def test_t1_d1_openshell():
     assert np.isclose(test_d1d, true_d1d)
     assert np.sqrt(2) * test_t1d <= test_d1d
 
+def test_t1_d1_oxygen():
+    """Test open shell t1-diagnostic on O2 molecule
+
+    Compare with output from Psi4
+
+    * Input:
+
+    molecule oxygen {
+      0 3
+      O 0.0 0.0 0.0
+      O 0.0 0.0 1.1
+      no_reorient
+      symmetry c1
+    }
+
+    set {
+      reference rohf
+      basis cc-pvtz
+    }
+
+    energy('CCSD')
+     
+    * Output 
+    @ROHF Final Energy:  -149.65170765644311   
+
+                   Solving CC Amplitude Equations 
+                    ------------------------------                                           
+      Iter             Energy              RMS        T1Diag      D1Diag    New D1Diag    D2Diag
+      ----     ---------------------    ---------   ----------  ----------  ----------   -------- 
+       ...                                                                                          
+       10        -0.464506962190602    1.907e-07    0.004390    0.009077    0.009077    0.000000
+       11        -0.464506960753097    5.104e-08    0.004390    0.009077    0.009077    0.000000 
+
+      Iterations converged.                                                           
+    """                             
+    
+    mol = gto.M()                                                                                    
+    mol.atom = 'O 0 0 0; O 0 0 1.1'                                                                  
+    mol.basis = 'cc-pvtz'                                                                            
+    mol.spin = 2                                                                                     
+    mol.build()                                                                                      
+    
+    mf = scf.ROHF(mol)                                                                                
+    mf.kernel()                                                                                      
+                                                                                                     
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(mf)                                                                               
+    mycc_uhf.kernel()                                                                                    
+    
+    t1a, t1b = mycc_uhf.t1                                                                           
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], 
+                                          uhf_mf.nelec[0], uhf_mf.nelec[1])
+    
+    assert np.isclose(mf.e_tot, -149.651708, atol=1e-6)
+    assert np.isclose(mycc_uhf.e_corr, -0.464507, atol=1e-6)
+    assert np.isclose(test_t1d, 0.004390, atol=1e-4)
+    assert np.isclose(test_d1d, 0.009077, atol=1e-4)
+
 
 def test_t1_d1_bound():
     """sqrt(2) * t1 <= d1"""
