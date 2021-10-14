@@ -139,6 +139,7 @@ def test_reiher_df_ccsd_t():
 
     assert np.allclose(np.round(error,decimals=2),[-87.91,0.44,0.00])
 
+
 def test_t1_d1_openshell():
     """Test open shell t1-diagnostic by reducing back to closed shell"""
     mol = gto.M()
@@ -163,3 +164,23 @@ def test_t1_d1_openshell():
 
     assert np.isclose(test_t1d, true_t1d)
     assert np.isclose(test_d1d, true_d1d)
+    assert np.sqrt(2) * test_t1d <= test_d1d
+
+
+def test_t1_d1_bound():
+    """sqrt(2) * t1 <= d1"""
+    mol = gto.M()
+    mol.atom = 'O 0 0 0; O 0 0 1.4'
+    mol.basis = 'cc-pvtz'
+    mol.spin = 2
+    mol.build()
+    mf = scf.ROHF(mol)
+    mf.kernel()
+    mycc = cc.CCSD(mf)
+    mycc.kernel()
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(uhf_mf)
+    mycc_uhf.kernel()
+    t1a, t1b = mycc_uhf.t1
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], uhf_mf.nelec[0], uhf_mf.nelec[1])
+    assert np.sqrt(2) * test_t1d <= test_d1d

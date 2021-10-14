@@ -483,9 +483,10 @@ def ccsd_t(h1, eri, ecore, num_alpha: int, num_beta: int, eri_full = None, use_k
     print("Total energy: ", e_tot)
     return e_scf, e_cor, e_tot
 
+
 def open_shell_t1_d1(t1a, t1b, mo_occ, nalpha, nbeta):
     """
-    T1-diagnostic for open-shell is defined w.r.t Sx eigenfunction of T1
+    T1-diagnostic for open-shell is defined w.r.t Sx eigenfunction of T1 where reference is ROHF.
 
     given i double occ, c unoccupied, x is single occuplied The T1 amps (high spin) in Sz basis are
     T1 = t_{ia}^{ca}(ca^ ia) + t_{ib}^{cb}(cb^ ib) + t_{xa}^{ca}(ca^ xa) + t_{ib}^{xb}(xb^ ib)
@@ -501,34 +502,55 @@ def open_shell_t1_d1(t1a, t1b, mo_occ, nalpha, nbeta):
     sqrt(sum_{ia}(f_{ia})^2 + 2sum_{xa}(t_{xa}^{ca})^2 + 2 sum_{ix}(t_{ib}^{xb})^2) / 2 sqrt{N}
 
     To get this relate eqs 3-7 from Chemical Physics Letters 372 (2003) 362–367 to Eqs. 45, 46, and 51
+    from Journal of Chemical Physics 98, 9734 (1993); doi: 10.1063/1.464352.
     """
     # compute t1-diagnostic
     docc_idx = np.where(np.isclose(mo_occ, 2.))[0]
     socc_idx = np.where(np.isclose(mo_occ, 1.))[0]
     virt_idx = np.where(np.isclose(mo_occ, 0.))[0]
-    t1a_docc = t1a[docc_idx, :]
-    t1b_docc = t1b[docc_idx, :][:, -len(virt_idx):]
-    assert t1a_docc.shape == t1b_docc.shape
-    print(len(virt_idx), t1b.shape)
-    assert nalpha - nbeta + len(virt_idx) == t1b.shape[1]
-    t1_diagnostic = np.sqrt(np.sum((t1a_docc + t1b_docc) ** 2) +
-                            2 * np.sum(t1a[socc_idx, :] ** 2) +
-                            2 * np.sum(t1b[docc_idx, :][:, len(socc_idx)] ** 2)
-                            ) / (2 * np.sqrt(nalpha + nbeta))
+    t1a_docc = t1a[docc_idx, :]  # double occ-> virtual
+    t1b_docc = t1b[docc_idx, :][:, -len(virt_idx):]  # double occ-> virtual
+    if len(socc_idx) > 0:
+        t1_xa = t1a[socc_idx, :]  # single occ -> virtual
+        t1_ix = t1b[docc_idx, :][:, :len(socc_idx)]  # double occ -> single occ
+    else:
+        t1_xa = np.array(())
+        t1_ix = np.array(())
 
+    if nalpha - nbeta + len(virt_idx) != t1b.shape[1]:
+        raise ValueError(
+            "Inconsistent shapes na {}, nb {}, t1b.shape {},{}".format(nalpha, nbeta, t1b.shape[0], t1b.shape[1]))
+
+    if t1a_docc.shape != (len(docc_idx), len(virt_idx)):
+        raise ValueError("T1a_ia does not have the right shape")
+    if t1b_docc.shape != (len(docc_idx), len(virt_idx)):
+        raise ValueError("T1b_ia does not have the right shape")
+    if len(socc_idx) > 0:
+        if t1_ix.shape != (len(docc_idx), len(socc_idx)):
+            raise ValueError("T1_ix does not have the right shape")
+        if t1_xa.shape != (len(socc_idx), len(virt_idx)):
+            raise ValueError("T1_xa does not have the right shape")
+
+    t1_diagnostic = np.sqrt(np.sum((t1a_docc + t1b_docc) ** 2) +
+                            2 * np.sum(t1_xa ** 2) +
+                            2 * np.sum(t1_ix ** 2)
+                            ) / (2 * np.sqrt(nalpha + nbeta))
     # compute D1-diagnostic
     f_ia = 0.5 * (t1a_docc + t1b_docc)
     s_f_ia_2, _ = np.linalg.eigh(f_ia @ f_ia.T)
+    s_f_ia_2_norm = np.sqrt(np.max(s_f_ia_2, initial=0))
 
     if len(socc_idx) > 0:
-        f_xa = np.sqrt(1 / 2) * t1a[socc_idx, :]
-        f_ix = np.sqrt(1 / 2) * t1b[docc_idx, :][:, len(socc_idx):]
+        f_xa = np.sqrt(1 / 2) * t1_xa
+        f_ix = np.sqrt(1 / 2) * t1_ix
         s_f_xa_2, _ = np.linalg.eigh(f_xa @ f_xa.T)
         s_f_ix_2, _ = np.linalg.eigh(f_ix @ f_ix.T)
     else:
         s_f_xa_2 = np.array(())
         s_f_ix_2 = np.array(())
+    s_f_xa_2_norm = np.sqrt(np.max(s_f_xa_2, initial=0))
+    s_f_ix_2_norm = np.sqrt(np.max(s_f_ix_2, initial=0))
 
-    d1_diagnostic = np.max(np.array([np.sqrt(np.max(s_f_ia_2, initial=0)), np.sqrt(np.max(s_f_xa_2, initial=0)),
-                                     np.sqrt(np.max(s_f_ix_2, initial=0))]))
+    d1_diagnostic = np.max(np.array([s_f_ia_2_norm, s_f_xa_2_norm, s_f_ix_2_norm]))
+
     return t1_diagnostic, d1_diagnostic
