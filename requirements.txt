@@ -4,3 +4,5 @@ cirq~=0.11
 numpy
 openfermion>=1.1.0
 scipy
+jax
+jaxlib

@@ -5,7 +5,8 @@ from os import path
 from pyscf import gto, scf, cc
 from chemftr import sf, df
 from chemftr.utils import QR, QI, QR2, QI2, power_two
-from chemftr.molecule import load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t
+from chemftr.molecule import (load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t,
+                              open_shell_t1_d1, )
 
 
 def test_full_ccsd_t():
@@ -137,3 +138,107 @@ def test_reiher_df_ccsd_t():
     error = (appx_energy - exact_energy)*1E3  # mEh
 
     assert np.allclose(np.round(error,decimals=2),[-87.91,0.44,0.00])
+
+
+def test_t1_d1_openshell():
+    """Test open shell t1-diagnostic by reducing back to closed shell"""
+    mol = gto.M()
+    mol.atom = 'N 0 0 0; N 0 0 1.4'
+    mol.basis = 'cc-pvtz'
+    mol.spin = 0
+    mol.build()
+
+    mf = scf.RHF(mol)
+    mf.kernel()
+
+    mycc = cc.CCSD(mf)
+    mycc.kernel()
+
+    true_t1d, true_d1d = mycc.get_t1_diagnostic(), mycc.get_d1_diagnostic()
+
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(uhf_mf)
+    mycc_uhf.kernel()
+    t1a, t1b = mycc_uhf.t1
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], uhf_mf.nelec[0], uhf_mf.nelec[1])
+
+    assert np.isclose(test_t1d, true_t1d)
+    assert np.isclose(test_d1d, true_d1d)
+    assert np.sqrt(2) * test_t1d <= test_d1d
+
+def test_t1_d1_oxygen():
+    """Test open shell t1-diagnostic on O2 molecule
+
+    Compare with output from Psi4
+
+    * Input:
+
+    molecule oxygen {
+      0 3
+      O 0.0 0.0 0.0
+      O 0.0 0.0 1.1
+      no_reorient
+      symmetry c1
+    }
+
+    set {
+      reference rohf
+      basis cc-pvtz
+    }
+
+    energy('CCSD')
+     
+    * Output 
+    @ROHF Final Energy:  -149.65170765644311   
+
+                   Solving CC Amplitude Equations 
+                    ------------------------------                                           
+      Iter             Energy              RMS        T1Diag      D1Diag    New D1Diag    D2Diag
+      ----     ---------------------    ---------   ----------  ----------  ----------   -------- 
+       ...                                                                                          
+       10        -0.464506962190602    1.907e-07    0.004390    0.009077    0.009077    0.000000
+       11        -0.464506960753097    5.104e-08    0.004390    0.009077    0.009077    0.000000 
+
+      Iterations converged.                                                           
+    """                             
+    
+    mol = gto.M()                                                                                    
+    mol.atom = 'O 0 0 0; O 0 0 1.1'                                                                  
+    mol.basis = 'cc-pvtz'                                                                            
+    mol.spin = 2                                                                                     
+    mol.build()                                                                                      
+    
+    mf = scf.ROHF(mol)                                                                                
+    mf.kernel()                                                                                      
+                                                                                                     
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(mf)                                                                               
+    mycc_uhf.kernel()                                                                                    
+    
+    t1a, t1b = mycc_uhf.t1                                                                           
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], 
+                                          uhf_mf.nelec[0], uhf_mf.nelec[1])
+    
+    assert np.isclose(mf.e_tot, -149.651708, atol=1e-6)
+    assert np.isclose(mycc_uhf.e_corr, -0.464507, atol=1e-6)
+    assert np.isclose(test_t1d, 0.004390, atol=1e-4)
+    assert np.isclose(test_d1d, 0.009077, atol=1e-4)
+
+
+def test_t1_d1_bound():
+    """sqrt(2) * t1 <= d1"""
+    mol = gto.M()
+    mol.atom = 'O 0 0 0; O 0 0 1.4'
+    mol.basis = 'cc-pvtz'
+    mol.spin = 2
+    mol.build()
+    mf = scf.ROHF(mol)
+    mf.kernel()
+    mycc = cc.CCSD(mf)
+    mycc.kernel()
+    uhf_mf = scf.convert_to_uhf(mf)
+    mycc_uhf = cc.CCSD(uhf_mf)
+    mycc_uhf.kernel()
+    t1a, t1b = mycc_uhf.t1
+    test_t1d, test_d1d = open_shell_t1_d1(t1a, t1b, uhf_mf.mo_occ[0] + uhf_mf.mo_occ[1], uhf_mf.nelec[0], uhf_mf.nelec[1])
+    assert np.sqrt(2) * test_t1d <= test_d1d
