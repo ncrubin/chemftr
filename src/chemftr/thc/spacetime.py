@@ -14,7 +14,7 @@ def qubit_vs_toffoli(lam, dE, eps, n, chi, beta, M, algorithm='half', verbose=Fa
         lam (float) - the lambda-value for the Hamiltonian
         dE (float) - allowable error in phase estimation. usually 0.001
         eps (float) - allowable error for synthesis (dE/(10 * lam)) usually
-        n (int) - number of spatial orbitals.
+        n (int) - number of spin orbitals.
         chi (int) - number of bits of precision for state prep
         beta (int) - number of bits of precision for rotations
         M (int) - THC rank or r_{Thc}
