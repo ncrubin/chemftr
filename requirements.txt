@@ -1,8 +1,8 @@
 pyscf
 h5py~=3.3.0
-cirq~=0.11
+cirq~=0.12
 numpy
-openfermion>=1.1.0
+openfermion>=1.2.0
 scipy
 jax
 jaxlib
