@@ -2,7 +2,7 @@
 import numpy as np
 from pyscf import scf
 from chemftr import df
-from chemftr.molecule import rank_reduced_ccsd_t, cas_to_pyscf, pyscf_to_cas
+from chemftr.molecule import factorized_ccsd_t, cas_to_pyscf, pyscf_to_cas
 
 
 def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.001,chi=10,beta=20, use_kernel=True,no_triples=False):
@@ -47,7 +47,7 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
         pyscf_mol, pyscf_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf))
                                                                                                          
     # Reference calculation (eri_rr= None is full rank / exact ERIs)                                   
-    escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
+    escf, ecor, etot = factorized_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
 
     exact_ecor = ecor
     exact_etot = etot
@@ -72,9 +72,9 @@ def generate_costing_table(pyscf_mf,name='molecule',thresh_range=[0.0001],dE=0.0
         print("{}".format('-'*139),file=f)                                                                           
     for thresh in thresh_range:                                                                        
         # First, up: lambda and CCSD(T)
-        eri_rr, LR, L, Lxi = df.rank_reduce(pyscf_mf._eri, thresh=thresh) 
+        eri_rr, LR, L, Lxi = df.factorize(pyscf_mf._eri, thresh=thresh) 
         lam = df.compute_lambda(pyscf_mf, LR)
-        escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
+        escf, ecor, etot = factorized_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
         l2_norm_error_eri = np.linalg.norm(eri_rr - pyscf_mf._eri)  # ERI reconstruction error
       

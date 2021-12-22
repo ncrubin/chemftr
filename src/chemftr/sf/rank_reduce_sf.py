@@ -3,7 +3,7 @@ import numpy as np
 from chemftr.utils import eigendecomp 
 
 
-def rank_reduce(eri_full, rank):
+def factorize(eri_full, rank):
     """ Do single factorization of the ERI tensor
 
     Args:

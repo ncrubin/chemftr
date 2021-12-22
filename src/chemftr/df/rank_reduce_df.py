@@ -3,7 +3,7 @@ import numpy as np
 from chemftr.utils import eigendecomp 
 
 
-def rank_reduce(eri_full, thresh):
+def factorize(eri_full, thresh):
     """ Do double factorization of the ERI tensor
 
     Args:

@@ -15,5 +15,5 @@ from .spacetime import qubit_vs_toffoli
 
 from .compute_lambda_thc import compute_lambda
 from .compute_cost_thc import compute_cost
-from .rank_reduce_thc import thc_via_cp3 as rank_reduce
+from .factorize_thc import thc_via_cp3 as factorize
 from .generate_costing_table_thc import generate_costing_table

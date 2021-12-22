@@ -332,7 +332,7 @@ def save_pyscf_to_casfile(fname, pyscf_mf, cas_orbitals: Optional[int] = None,
         fid.create_dataset('active_nalpha', data=int(num_alpha), dtype=int)
         fid.create_dataset('active_nbeta', data=int(num_beta), dtype=int)
 
-def rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True, no_triples=False)\
+def factorized_ccsd_t(pyscf_mf, eri_rr = None, use_kernel = True, no_triples=False)\
     -> Tuple[float, float, float]:
     """ Compute CCSD(T) energy using rank-reduced ERIs
 

@@ -41,7 +41,7 @@ if os.path.isfile(REIHER_INTS):
 
     """ Single factorization on Reiher FeMoco """
     RANK = 200
-    sf_factors = sf.rank_reduce(mf._eri, rank=RANK)[1]
+    sf_factors = sf.factorize(mf._eri, rank=RANK)[1]
     lam = sf.compute_lambda(mf, sf_factors)  
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
@@ -60,7 +60,7 @@ if os.path.isfile(REIHER_INTS):
     """ Double factorization on Reiher FeMoco """
     BETA = 16
     THRESH = 0.00125
-    _, df_factors, rank, num_eigen = df.rank_reduce(mf._eri, thresh=THRESH)
+    _, df_factors, rank, num_eigen = df.factorize(mf._eri, thresh=THRESH)
     lam = df.compute_lambda(mf, df_factors)
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
@@ -82,7 +82,7 @@ if os.path.isfile(LI_INTS):
 
     """ Single factorization on Li FeMoco """
     RANK = 275
-    sf_factors = sf.rank_reduce(mf._eri, rank=RANK)[1]
+    sf_factors = sf.factorize(mf._eri, rank=RANK)[1]
     lam = sf.compute_lambda(mf, sf_factors)  
     
     # Here we're using an initial calculation with a very rough estimate of the number of steps
@@ -101,7 +101,7 @@ if os.path.isfile(LI_INTS):
     """ Double factorization on Li FeMoco """
     BETA = 20
     THRESH = 0.00125
-    _, df_factors, rank, num_eigen = df.rank_reduce(mf._eri, thresh=THRESH)
+    _, df_factors, rank, num_eigen = df.factorize(mf._eri, thresh=THRESH)
     lam = df.compute_lambda(mf, df_factors)
 
     # Here we're using an initial calculation with a very rough estimate of the number of steps

@@ -31,7 +31,7 @@ if os.path.isfile(REIHER_INTS):
     """ THC factorization on Reiher FeMoco """
     BETA = 16
     NTHC = 350 
-    _, thc_leaf, thc_central, info = thc.rank_reduce(mf._eri, NTHC)
+    _, thc_leaf, thc_central, info = thc.factorize(mf._eri, NTHC)
     lam = thc.compute_lambda(mf, thc_leaf, thc_central)[0]
     
    # # Here we're using an initial calculation with a very rough estimate of the number of steps
@@ -52,7 +52,7 @@ if os.path.isfile(LI_INTS):
     """ THC factorization on Li FeMoco """
     BETA = 20 
     NTHC = 450 
-    _, thc_leaf, thc_central, info = thc.rank_reduce(mf._eri, NTHC)
+    _, thc_leaf, thc_central, info = thc.factorize(mf._eri, NTHC)
     lam = thc.compute_lambda(mf, thc_leaf, thc_central)[0]
     
    # # Here we're using an initial calculation with a very rough estimate of the number of steps

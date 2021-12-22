@@ -2,7 +2,7 @@
 import numpy as np
 from pyscf import scf
 from chemftr import thc 
-from chemftr.molecule import rank_reduced_ccsd_t, cas_to_pyscf, pyscf_to_cas
+from chemftr.molecule import factorized_ccsd_t, cas_to_pyscf, pyscf_to_cas
 
 
 def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=0.001,chi=10,beta=20,save_thc=False, use_kernel=True, no_triples=False, **kwargs):
@@ -19,7 +19,7 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         use_kernel (bool) - re-do SCF prior to estimating CCSD(T) error? Will use canonical orbitals
             and full ERIs for the one-body contributions, using rank-reduced ERIs for two-body
         no_triples (bool) - if True, skip the (T) correction, doing only rank-reduced CCSD
-        kwargs: additional keyword arguments to pass to thc.rank_reduce()
+        kwargs: additional keyword arguments to pass to thc.factorize()
  
     Returns:
        None
@@ -49,7 +49,7 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
         pyscf_mol, pyscf_mf = cas_to_pyscf(*pyscf_to_cas(pyscf_mf))
                                                                                                          
     # Reference calculation (eri_rr= None is full rank / exact ERIs)                                   
-    escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
+    escf, ecor, etot = factorized_ccsd_t(pyscf_mf, eri_rr = None, use_kernel=use_kernel, no_triples=no_triples)
 
     exact_ecor = ecor
     exact_etot = etot
@@ -78,9 +78,9 @@ def generate_costing_table(pyscf_mf,name='molecule',nthc_range=[250,300,350],dE=
             fname = name + '_nTHC_' + str(nthc).zfill(5)  # will save as HDF5 and add .h5 extension
         else:
             fname = None
-        eri_rr, thc_leaf, thc_central, info  = thc.rank_reduce(pyscf_mf._eri, nthc, thc_save_file=fname, **kwargs) 
+        eri_rr, thc_leaf, thc_central, info  = thc.factorize(pyscf_mf._eri, nthc, thc_save_file=fname, **kwargs) 
         lam = thc.compute_lambda(pyscf_mf, thc_leaf, thc_central)[0]
-        escf, ecor, etot = rank_reduced_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
+        escf, ecor, etot = factorized_ccsd_t(pyscf_mf, eri_rr, use_kernel=use_kernel, no_triples=no_triples)
         error = (etot - exact_etot)*1E3  # to mEh
         l2_norm_error_eri = np.linalg.norm(eri_rr - pyscf_mf._eri)  # ERI reconstruction error
       

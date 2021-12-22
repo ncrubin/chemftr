@@ -30,7 +30,7 @@ except ImportError:
     from importlib_resources import files                                                            
 from chemftr import df
 from chemftr.utils import RunSilent
-from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
+from chemftr.molecule import load_casfile_to_pyscf, factorized_ccsd_t
 
 DE = 0.001  # max allowable phase error
 CHI = 10    # number of bits for representation of coefficients
@@ -44,7 +44,7 @@ n_orb = reiher_mf.mo_coeff.shape[0]  # num spin orbitals is num MOs x 2 for RHF
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
 with RunSilent():
-    escf, ecor, etot = rank_reduced_ccsd_t(reiher_mf, eri_rr = None, use_kernel = USE_KERNEL)
+    escf, ecor, etot = factorized_ccsd_t(reiher_mf, eri_rr = None, use_kernel = USE_KERNEL)
 
 exact_ecor = ecor
 
@@ -57,9 +57,9 @@ print("{}".format('-'*76))
 for thresh in [0.1, 0.05, 0.025, 0.0125, 0.01, 0.0075, 0.005, 0.0025, 0.00125, 0.001, 0.00075, \
                0.0005, 0.000125, 0.0001, 0.00005]:
     with RunSilent():
-        eri_rr, df_factors, L, Lxi = df.rank_reduce(reiher_mf._eri, thresh)
+        eri_rr, df_factors, L, Lxi = df.factorize(reiher_mf._eri, thresh)
         lam  = df.compute_lambda(reiher_mf, df_factors)
-        escf, ecor, etot = rank_reduced_ccsd_t(reiher_mf, eri_rr) 
+        escf, ecor, etot = factorized_ccsd_t(reiher_mf, eri_rr) 
         error = (ecor - exact_ecor)*1E3  # to mEh
     print("{:^12.6f} {:^12} {:^12} {:^12.1f} {:^24.2f}".format(thresh,L,Lxi,lam,error))
 print("{}".format('='*76))

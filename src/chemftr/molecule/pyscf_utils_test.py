@@ -5,7 +5,7 @@ from os import path
 from pyscf import gto, scf, cc
 from chemftr import sf, df
 from chemftr.utils import QR, QI, QR2, QI2, power_two
-from chemftr.molecule import (load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, rank_reduced_ccsd_t,
+from chemftr.molecule import (load_casfile_to_pyscf, pyscf_to_cas, ccsd_t, stability, factorized_ccsd_t,
                               open_shell_t1_d1, )
 
 
@@ -102,15 +102,15 @@ def test_reiher_sf_ccsd_t():
 
     NAME     = path.join(path.dirname(__file__), '../integrals/eri_reiher.h5')
     mol, mf = load_casfile_to_pyscf(NAME, num_alpha = 27, num_beta = 27)
-    escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr = None)  # use full (local) ERIs for 2-body
+    escf, ecorr, etot = factorized_ccsd_t(mf, eri_rr = None)  # use full (local) ERIs for 2-body
     exact_energy = ecorr
     appx_energy = []
     # FIXME: can reduce the time of test by testing just one rank-reduction
     # I'm happy to keep it a bit more rigorous for now 
     ranks = [100,200,300]
     for rank in ranks:
-        eri_rr, _ = sf.rank_reduce(mf._eri, rank)
-        escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr) 
+        eri_rr, _ = sf.factorize(mf._eri, rank)
+        escf, ecorr, etot = factorized_ccsd_t(mf, eri_rr) 
         appx_energy.append(ecorr)
 
     appx_energy = np.asarray(appx_energy)
@@ -123,15 +123,15 @@ def test_reiher_df_ccsd_t():
 
     NAME     = path.join(path.dirname(__file__), '../integrals/eri_reiher.h5')
     mol, mf = load_casfile_to_pyscf(NAME, num_alpha = 27, num_beta = 27)
-    escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr = None)  # use full (local) ERIs for 2-body
+    escf, ecorr, etot = factorized_ccsd_t(mf, eri_rr = None)  # use full (local) ERIs for 2-body
     exact_energy = ecorr
     appx_energy = []
     # FIXME: can reduce the time of test by testing just one rank-reduction
     # I'm happy to keep it a bit more rigorous for now 
     thresholds = [0.1, 0.00125, 0.00005]
     for THRESH in thresholds:
-        eri_rr, _, _, _ = df.rank_reduce(mf._eri, thresh=THRESH)
-        escf, ecorr, etot = rank_reduced_ccsd_t(mf, eri_rr)
+        eri_rr, _, _, _ = df.factorize(mf._eri, thresh=THRESH)
+        escf, ecorr, etot = factorized_ccsd_t(mf, eri_rr)
         appx_energy.append(ecorr)
 
     appx_energy = np.asarray(appx_energy)

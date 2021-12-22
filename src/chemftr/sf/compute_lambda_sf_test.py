@@ -12,7 +12,7 @@ def test_reiher_sf_lambda():
 
     NAME     = path.join(path.dirname(__file__), '../integrals/eri_reiher.h5')
     _, reiher_mf = load_casfile_to_pyscf(NAME, num_alpha = 27, num_beta = 27) 
-    eri_rr, sf_factors = sf.rank_reduce(reiher_mf._eri, RANK)
+    eri_rr, sf_factors = sf.factorize(reiher_mf._eri, RANK)
     lambda_tot = sf.compute_lambda(reiher_mf, sf_factors)
     assert eri_rr.shape[0] * 2 == 108
     assert np.isclose(lambda_tot,4258.0)

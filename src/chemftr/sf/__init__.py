@@ -14,5 +14,5 @@
 
 from .compute_lambda_sf import compute_lambda
 from .compute_cost_sf import compute_cost
-from .rank_reduce_sf import rank_reduce
+from .factorize_sf import factorize
 from .generate_costing_table_sf import generate_costing_table

@@ -32,7 +32,7 @@ except ImportError:
     from importlib_resources import files                                                            
 from chemftr import sf
 from chemftr.utils import RunSilent
-from chemftr.molecule import load_casfile_to_pyscf, rank_reduced_ccsd_t
+from chemftr.molecule import load_casfile_to_pyscf, factorized_ccsd_t
 
 
 DE = 0.001  # max allowable phase error
@@ -47,7 +47,7 @@ n_orb = reiher_mf.mo_coeff.shape[0] * 2  # number spin orbitals is number of MOs
 # Reference calculation (dim = None is full cholesky / exact ERIs)
 # run silently
 with RunSilent():
-    escf, ecor, etot = rank_reduced_ccsd_t(reiher_mf, eri_rr = None, use_kernel = USE_KERNEL)
+    escf, ecor, etot = factorized_ccsd_t(reiher_mf, eri_rr = None, use_kernel = USE_KERNEL)
 
 exact_ecor = ecor
 
@@ -59,9 +59,9 @@ print("{}".format('-'*48))
 for rank in range(50,401,25):
     # run silently
     with RunSilent():
-        eri_rr, sf_factors = sf.rank_reduce(reiher_mf._eri, rank)
+        eri_rr, sf_factors = sf.factorize(reiher_mf._eri, rank)
         lam = sf.compute_lambda(reiher_mf, sf_factors)
-        escf, ecor, etot   = rank_reduced_ccsd_t(reiher_mf, eri_rr) 
+        escf, ecor, etot   = factorized_ccsd_t(reiher_mf, eri_rr) 
         error = (ecor - exact_ecor)*1E3  # to mEh
     print("{:^12} {:^12.1f} {:^24.2f}".format(rank,lam,error))
 print("{}".format('='*48))

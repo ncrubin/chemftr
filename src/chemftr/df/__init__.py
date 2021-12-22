@@ -14,5 +14,5 @@
 
 from .compute_lambda_df import compute_lambda
 from .compute_cost_df import compute_cost
-from .rank_reduce_df import rank_reduce
+from .factorize_df import factorize
 from .generate_costing_table_df import generate_costing_table
