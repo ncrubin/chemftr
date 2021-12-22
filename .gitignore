@@ -126,3 +126,6 @@ dmypy.json
 # ignore generated .molden files and .chk files
 *.chk
 *.molden
+
+# some large integral files for testing
+src/chemftr/integrals/eri_li.h5
